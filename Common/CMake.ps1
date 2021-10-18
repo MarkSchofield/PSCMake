@@ -128,6 +128,25 @@ function GetCMake {
     $CMake
 }
 
+function ResolvePresets {
+    param (
+        $CMakePresetsJson,
+        $BuildPresetName
+    )
+
+    $BuildPreset = $CMakePresetsJson.buildPresets | Where-Object { $_.name -eq $BuildPresetName }
+    if (-not $BuildPreset) {
+        Write-Error "Unable to find build preset '$Preset' in $script:CMakePresetsPath"
+    }
+
+    $ConfigurePreset = $CMakePresetsJson.configurePresets | Where-Object { $_.name -eq $BuildPreset.configurePreset }
+    if (-not $ConfigurePreset) {
+        Write-Error "Unable to find configuration preset '$($BuildPreset.configurePreset)' in $script:CMakePresetsPath"
+    }
+
+    $BuildPreset, $ConfigurePreset
+}
+
 function ResolvePresetProperty {
     param(
         $BuildPreset,

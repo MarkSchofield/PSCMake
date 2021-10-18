@@ -84,8 +84,7 @@ function BuildTargetsCompleter {
     )
     $CMakePresetsJson = GetCMakePresets -Silent
     $Preset = $FakeBoundParameters.Presets | Select-Object -First 1
-    $BuildPreset = $CMakePresetsJson.buildPresets | Where-Object { $_.name -eq $Preset }
-    $ConfigurePreset = $CMakePresetsJson.configurePresets | Where-Object { $_.name -eq $BuildPreset.configurePreset }
+    $BuildPreset, $ConfigurePreset = ResolvePresets $CMakePresetsJson $Preset
     $BinaryDirectory = GetBinaryDirectory $ConfigurePreset
     $CMakeCodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
 
@@ -131,10 +130,6 @@ function Configure-CMakeBuild {
         [string[]] $Presets
     )
     $CMakePresetsJson = GetCMakePresets
-    if (-not $CMakePresetsJson) {
-        Write-Error "Unable to find 'CMakePresets.json' in the current folder scope."
-    }
-
     $PresetNames = GetConfigurePresetNames $CMakePresetsJson
     if (-not $Presets) {
         $Presets = , $PresetNames[0]
@@ -203,10 +198,6 @@ function Build-CMakeBuild {
         [switch] $Configure
     )
     $CMakePresetsJson = GetCMakePresets
-    if (-not $CMakePresetsJson) {
-        Write-Error "Unable to find 'CMakePresets.json' in the current folder scope."
-    }
-
     $PresetNames = GetBuildPresetNames $CMakePresetsJson
 
     if (-not $Presets) {
@@ -219,16 +210,7 @@ function Build-CMakeBuild {
 
     $CMake = GetCMake
     foreach ($Preset in $Presets) {
-        $BuildPreset = $CMakePresetsJson.buildPresets | Where-Object { $_.name -eq $Preset }
-        if (-not $BuildPreset) {
-            Write-Error "Unable to find build preset '$Preset' in $script:CMakePresetsPath"
-        }
-
-        $ConfigurePreset = $CMakePresetsJson.configurePresets | Where-Object { $_.name -eq $BuildPreset.configurePreset }
-        if (-not $ConfigurePreset) {
-            Write-Error "Unable to find configuration preset '$($BuildPreset.configurePreset)' in $script:CMakePresetsPath"
-        }
-
+        $BuildPreset, $ConfigurePreset = ResolvePresets $CMakePresetsJson $Preset
         $BinaryDirectory = GetBinaryDirectory $ConfigurePreset
         $CMakeCacheFile = Join-Path -Path $BinaryDirectory -ChildPath 'CMakeCache.txt'
 
