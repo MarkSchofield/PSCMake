@@ -206,13 +206,41 @@ function Enable-CMakeBuildQuery {
         }
 }
 
+function Get-CMakeBuildCodeModelDirectory {
+    param (
+        [string] $BinaryDirectory
+    )
+    Join-Path -Path $BinaryDirectory -ChildPath '.cmake/api/v1/reply'
+}
+
 function Get-CMakeBuildCodeModel {
     param (
         [string] $BinaryDirectory
     )
-    $CMakeReplyApiDirectory = Join-Path -Path $BinaryDirectory -ChildPath '.cmake/api/v1/reply'
-    Get-ChildItem -Path $CMakeReplyApiDirectory -File -Filter 'codemodel-v2-*' |
+    Get-ChildItem -Path (Get-CMakeBuildCodeModelDirectory $BinaryDirectory) -File -Filter 'codemodel-v2-*' |
         Select-Object -First 1 |
         Get-Content |
         ConvertFrom-Json
+}
+
+function WriteDot {
+    param (
+        $Configuration,
+        $CodeModel,
+        $CodeModelDirectory
+    )
+    $Targets = @{}
+    "digraph CodeModel {"
+    ($CodeModel.configurations | Where-Object { $_.name -eq $Configuration }).targets |
+        ForEach-Object {
+            "  `"$($_.id)`" [label=`"$($_.name)`"]"
+            $Targets[$_.id] = Get-Content (Join-Path -Path $CodeModelDirectory -ChildPath $_.jsonFile) | ConvertFrom-Json
+        }
+    $Targets.GetEnumerator() | ForEach-Object {
+        $Source = $_.Name
+        Get-MemberValue -InputObject $_.Value -Name dependencies -Or @() | ForEach-Object {
+            "  `"$Source`" -> `"$($_.id)`" "
+        }
+    }
+    "}"
 }

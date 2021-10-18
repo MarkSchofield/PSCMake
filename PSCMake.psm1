@@ -248,7 +248,30 @@ function Build-CMakeBuild {
     }
 }
 
+function Write-CMakeBuild {
+    param (
+        [Parameter(Position = 0)]
+        [string] $Preset,
+
+        [Parameter(Position = 1)]
+        [string] $Configuration,
+
+        [ValidateSet('dot')]
+        [string] $As
+    )
+    $CMakePresetsJson = GetCMakePresets
+    $BuildPreset, $ConfigurePreset = ResolvePresets $CMakePresetsJson $Preset
+    $BinaryDirectory = GetBinaryDirectory $ConfigurePreset
+    $CodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
+    $CodeModelDirectory = Get-CMakeBuildCodeModelDirectory $BinaryDirectory
+
+    WriteDot $Configuration $CodeModel $CodeModelDirectory
+}
+
 Register-ArgumentCompleter -CommandName Build-CMakeBuild -ParameterName Presets -ScriptBlock $function:BuildPresetsCompleter
 Register-ArgumentCompleter -CommandName Build-CMakeBuild -ParameterName Configurations -ScriptBlock $function:BuildConfigurationsCompleter
 Register-ArgumentCompleter -CommandName Build-CMakeBuild -ParameterName Targets -ScriptBlock $function:BuildTargetsCompleter
 Register-ArgumentCompleter -CommandName Configure-CMakeBuild -ParameterName Presets -ScriptBlock $function:ConfigurePresetsCompleter
+
+Register-ArgumentCompleter -CommandName Write-CMakeBuild -ParameterName Preset -ScriptBlock $function:BuildPresetsCompleter
+Register-ArgumentCompleter -CommandName Write-CMakeBuild -ParameterName Configuration -ScriptBlock $function:BuildConfigurationsCompleter
