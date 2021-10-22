@@ -24,6 +24,9 @@
 #Requires -PSEdition Core
 
 Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+. $PSScriptRoot/Common.ps1
 
 $script:PreviousLocation = $null
 
@@ -149,14 +152,15 @@ function ResolvePresets {
 
 function ResolvePresetProperty {
     param(
-        $BuildPreset,
+        $CMakePresetsJson,
+        $ConfigurePreset,
         $PropertyName
     )
 
-    for ($Preset = $BuildPreset; $Preset; ) {
-        $PropertValue = $Preset.$PropertyName
-        if ($PropertValue) {
-            return $PropertValue
+    for ($Preset = $ConfigurePreset; $Preset; ) {
+        $PropertyValue = Get-MemberValue -InputObject $Preset -Name $PropertyName
+        if ($PropertyValue) {
+            return $PropertyValue
         }
 
         $BasePreset = $Preset.inherits
@@ -164,15 +168,16 @@ function ResolvePresetProperty {
             break
         }
 
-        $Preset = $CMakePresetsJson.buildPresets | Where-Object { $_.name -eq $BasePreset } | Select-Object -First 1
+        $Preset = $CMakePresetsJson.configurePresets | Where-Object { $_.name -eq $BasePreset } | Select-Object -First 1
     }
 }
 
 function GetBinaryDirectory {
     param(
-        $BuildPreset
+        $CMakePresetsJson,
+        $ConfigurePreset
     )
-    $BinaryDirectory = ResolvePresetProperty $BuildPreset 'binaryDir'
+    $BinaryDirectory = ResolvePresetProperty $CMakePresetsJson $ConfigurePreset 'binaryDir'
 
     # Perform macro-replacement
     $Result = for (; $BinaryDirectory; $BinaryDirectory = $Right) {
@@ -180,7 +185,7 @@ function GetBinaryDirectory {
         $Left
         switch -regex ($Match) {
             '\$\{sourceDir\}' { Split-Path $CMakePresetsPath }
-            '\$\{presetName\}' { $BuildPreset.name }
+            '\$\{presetName\}' { $ConfigurePreset.name }
             Default {}
         }
     }

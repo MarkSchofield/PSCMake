@@ -1,0 +1,44 @@
+{
+    "version": 3,
+    "cmakeMinimumRequired": {
+      "major": 3,
+      "minor": 21,
+      "patch": 0
+    },
+    "configurePresets": [
+      {
+        "name": "windows",
+        "binaryDir": "${sourceDir}/__output/${presetName}"
+      },
+      {
+        "name": "windows-x64",
+        "inherits": "windows",
+        "description": "This build is only available on Windows",
+        "displayName": "Windows-only configuration",
+        "cacheVariables": {
+          "CMAKE_SYSTEM_PROCESSOR": "x64",
+          "CMAKE_SYSTEM_VERSION": "10.0.19041.0"
+        },
+        "environment": {}
+      }
+    ],
+    "buildPresets": [
+      {
+        "name": "windows-x64",
+        "configurePreset": "windows-x64"
+      }
+    ],
+    "testPresets": [
+      {
+        "name": "default",
+        "configurePreset": "default",
+        "output": {
+          "outputOnFailure": true
+        },
+        "execution": {
+          "noTestsAction": "error",
+          "stopOnFailure": true
+        }
+      }
+    ]
+  }

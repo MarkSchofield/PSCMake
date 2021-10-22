@@ -85,7 +85,7 @@ function BuildTargetsCompleter {
     $CMakePresetsJson = GetCMakePresets -Silent
     $Preset = $FakeBoundParameters.Presets | Select-Object -First 1
     $BuildPreset, $ConfigurePreset = ResolvePresets $CMakePresetsJson $Preset
-    $BinaryDirectory = GetBinaryDirectory $ConfigurePreset
+    $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
     $CMakeCodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
 
     # TODO: Rather than picking the first configuration, see of the $FakeBoundParameters has a Configuration, or if the
@@ -145,7 +145,7 @@ function Configure-CMakeBuild {
             Write-Error "Unable to find configuration preset '$Preset' in $script:CMakePresetsPath"
         }
 
-        $BinaryDirectory = GetBinaryDirectory $ConfigurePreset
+        $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
         Enable-CMakeBuildQuery $BinaryDirectory
 
         $CMakeArguments = @(
@@ -211,7 +211,7 @@ function Build-CMakeBuild {
     $CMake = GetCMake
     foreach ($Preset in $Presets) {
         $BuildPreset, $ConfigurePreset = ResolvePresets $CMakePresetsJson $Preset
-        $BinaryDirectory = GetBinaryDirectory $ConfigurePreset
+        $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
         $CMakeCacheFile = Join-Path -Path $BinaryDirectory -ChildPath 'CMakeCache.txt'
 
         # Run CMake configure if;
