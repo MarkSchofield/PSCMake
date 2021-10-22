@@ -93,3 +93,16 @@ function Touch($Item) {
 function DownloadFile([string] $Url, [string] $DownloadPath) {
     [System.Net.WebClient]::new().DownloadFile($Url, $DownloadPath)
 }
+
+<#
+ .Synopsis
+  Searches the given location and parent folders looking for the given file.
+#>
+function GetPathOfFileAbove([string]$Location, [string]$File) {
+    for (; $Location.Length -ne 0; $Location = Split-Path $Location) {
+        if (Test-Path -PathType Leaf -Path (Join-Path -Path $Location -ChildPath $File)) {
+            $Location
+            break
+        }
+    }
+}
