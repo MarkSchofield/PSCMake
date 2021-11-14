@@ -28,6 +28,7 @@ $ErrorActionPreference = 'Stop'
 
 . $PSScriptRoot/Common/CMake.ps1
 . $PSScriptRoot/Common/Common.ps1
+. $PSScriptRoot/Common/Ninja.ps1
 
 <#
  .Synopsis
@@ -172,6 +173,9 @@ function Configure-CMakeBuild {
  .Parameter Configure
    A switch specifying whether the necessary configuration should be performed before the build is run.
 
+ .Parameter Report
+   [Exploration] A switch specifying whether a report should be written of the command times of the build. Ninja builds only.
+
  .Example
    # Build the 'windows-x64' and 'windows-x86' CMake builds.
    Build-CMakeBuild -Presets windows-x64,windows-x86
@@ -195,7 +199,10 @@ function Build-CMakeBuild {
         [string[]] $Targets,
 
         [Parameter()]
-        [switch] $Configure
+        [switch] $Configure,
+
+        [Parameter()]
+        [switch] $Report
     )
     $CMakePresetsJson = GetCMakePresets
     $PresetNames = GetBuildPresetNames $CMakePresetsJson
@@ -222,27 +229,29 @@ function Build-CMakeBuild {
             Configure-CMakeBuild -Presets $BuildPreset.configurePreset
         }
 
+        $CMakeArguments = @(
+            '--build'
+            '--preset', $Preset
+            if ($Targets) {
+                '--target', $Targets
+            }
+        )
+
         if (-not $Configurations) {
-            $CMakeArguments = @(
-                '--build'
-                '--preset', $Preset
-                if ($Targets) {
-                    '--target', $Targets
-                }
-            )
+            $StartTime = [datetime]::Now
             & $CMake @CMakeArguments
+            if ($Report) {
+                Report-NinjaBuild (Join-Path $BinaryDirectory '.ninja_log') $StartTime
+            }
         }
         else {
             foreach ($Configuration in $Configurations) {
-                $CMakeArguments = @(
-                    '--build'
-                    '--preset', $Preset
-                    '--config', $Configuration
-                    if ($Targets) {
-                        '--target', $Targets
-                    }
-                )
-                & $CMake @CMakeArguments
+                $StartTime = [datetime]::Now
+                & $CMake @CMakeArguments '--config' $Configuration
+                Report-NinjaBuild (Join-Path $BinaryDirectory '.ninja_log') $StartTime
+                if ($Report) {
+                    Report-NinjaBuild (Join-Path $BinaryDirectory '.ninja_log') $StartTime
+                }
             }
         }
     }
