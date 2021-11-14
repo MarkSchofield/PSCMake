@@ -34,3 +34,22 @@ function Get-MemberValue {
     )
     (Select-Object -InputObject $InputObject -ExpandProperty $Name -ErrorAction SilentlyContinue) ?? $Or
 }
+
+<#
+ .Synopsis
+  Performs linear interpolation from the first color to the second.
+#>
+function ColorInterpolation{
+    param(
+        [System.Drawing.Color]$FromColor,
+        [System.Drawing.Color]$ToColor,
+        [Single]$T
+    )
+
+    $Alpha = $FromColor.A + (($ToColor.A - $FromColor.A) * $T)
+    $Red = $FromColor.R + (($ToColor.R - $FromColor.R) * $T)
+    $Green = $FromColor.G + (($ToColor.G - $FromColor.G) * $T)
+    $Blue = $FromColor.B + (($ToColor.B - $FromColor.B) * $T)
+
+    [System.Drawing.Color]::FromArgb($Alpha, $Red, $Green, $Blue)
+}
