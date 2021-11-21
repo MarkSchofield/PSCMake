@@ -85,7 +85,7 @@ function BuildTargetsCompleter {
     )
     $CMakePresetsJson = GetCMakePresets -Silent
     $Preset = $FakeBoundParameters.Presets | Select-Object -First 1
-    $BuildPreset, $ConfigurePreset = ResolvePresets $CMakePresetsJson $Preset
+    $BuildPreset, $ConfigurePreset = ResolvePresets $CMakePresetsJson 'buildPresets' $Preset
     $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
     $CMakeCodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
 
@@ -224,7 +224,7 @@ function Build-CMakeBuild {
 
     $CMake = GetCMake
     foreach ($Preset in $Presets) {
-        $BuildPreset, $ConfigurePreset = ResolvePresets $CMakePresetsJson $Preset
+        $BuildPreset, $ConfigurePreset = ResolvePresets $CMakePresetsJson 'buildPresets' $Preset
         $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
         $CMakeCacheFile = Join-Path -Path $BinaryDirectory -ChildPath 'CMakeCache.txt'
 
@@ -277,7 +277,7 @@ function Write-CMakeBuild {
         [string] $As
     )
     $CMakePresetsJson = GetCMakePresets
-    $BuildPreset, $ConfigurePreset = ResolvePresets $CMakePresetsJson $Preset
+    $BuildPreset, $ConfigurePreset = ResolvePresets $CMakePresetsJson 'buildPresets' $Preset
     $BinaryDirectory = GetBinaryDirectory $ConfigurePreset
     $CodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
     $CodeModelDirectory = Get-CMakeBuildCodeModelDirectory $BinaryDirectory
@@ -289,6 +289,5 @@ Register-ArgumentCompleter -CommandName Build-CMakeBuild -ParameterName Presets 
 Register-ArgumentCompleter -CommandName Build-CMakeBuild -ParameterName Configurations -ScriptBlock $function:BuildConfigurationsCompleter
 Register-ArgumentCompleter -CommandName Build-CMakeBuild -ParameterName Targets -ScriptBlock $function:BuildTargetsCompleter
 Register-ArgumentCompleter -CommandName Configure-CMakeBuild -ParameterName Presets -ScriptBlock $function:ConfigurePresetsCompleter
-
 Register-ArgumentCompleter -CommandName Write-CMakeBuild -ParameterName Preset -ScriptBlock $function:BuildPresetsCompleter
 Register-ArgumentCompleter -CommandName Write-CMakeBuild -ParameterName Configuration -ScriptBlock $function:BuildConfigurationsCompleter
