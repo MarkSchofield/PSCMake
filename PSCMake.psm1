@@ -277,10 +277,24 @@ function Write-CMakeBuild {
         [string] $As
     )
     $CMakePresetsJson = GetCMakePresets
+    $PresetNames = GetBuildPresetNames $CMakePresetsJson
+
+    if (-not $Preset) {
+        if (-not $PresetNames) {
+            Write-Error "No Preset values specified, and one could not be inferred."
+        }
+        $Preset = $PresetNames[0]
+        Write-Output "No preset specified, defaulting to: $Preset"
+    }
+
     $BuildPreset, $ConfigurePreset = ResolvePresets $CMakePresetsJson 'buildPresets' $Preset
-    $BinaryDirectory = GetBinaryDirectory $ConfigurePreset
+    $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
     $CodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
     $CodeModelDirectory = Get-CMakeBuildCodeModelDirectory $BinaryDirectory
+
+    if (-not $Configuration) {
+        $Configuration = 'Debug'
+    }
 
     WriteDot $Configuration $CodeModel $CodeModelDirectory
 }
