@@ -151,7 +151,13 @@ function Configure-CMakeBuild {
 
         $CMakeArguments = @(
             '--preset', $Preset
+            if ($VerbosePreference) {
+                '--log-level=VERBOSE'
+            }
         )
+
+        Write-Verbose "CMake Arguments: $CMakeArguments"
+
         & $CMake @CMakeArguments
     }
 }
@@ -188,6 +194,7 @@ function Configure-CMakeBuild {
    Build-CMakeBuild -Presets windows-x64,windows-x86 -Configurations Release -Targets HelperLibrary
 #>
 function Build-CMakeBuild {
+    [CmdletBinding()]
     param (
         [Parameter(Position = 0)]
         [string[]] $Presets,
@@ -236,6 +243,8 @@ function Build-CMakeBuild {
                 '--target', $Targets
             }
         )
+
+        Write-Verbose "CMake Arguments: $CMakeArguments"
 
         if (-not $Configurations) {
             $StartTime = [datetime]::Now
