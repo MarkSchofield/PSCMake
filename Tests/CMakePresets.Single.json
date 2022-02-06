@@ -16,12 +16,27 @@
           "CMAKE_SYSTEM_VERSION": "10.0.19041.0"
         },
         "environment": {}
+      },
+      {
+        "name": "windows-arm",
+        "description": "A description for the 'windows-arm'",
+        "displayName": "Windows-only configuration",
+        "binaryDir": "${sourceDir}/__output/${presetName}",
+        "cacheVariables": {
+          "CMAKE_SYSTEM_PROCESSOR": "arm",
+          "CMAKE_SYSTEM_VERSION": "10.0.19041.0"
+        },
+        "environment": {}
       }
     ],
     "buildPresets": [
       {
         "name": "windows-x64",
         "configurePreset": "windows-x64"
+      },
+      {
+        "name": "windows-arm",
+        "configurePreset": "windows-arm"
       }
     ],
     "testPresets": [

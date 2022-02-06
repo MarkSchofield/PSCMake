@@ -68,7 +68,7 @@ function BuildConfigurationsCompleter {
         'Debug'
         'RelWithDebInfo'
         'MinSizeRel'
-    )
+    ) | Where-Object { $_ -ilike "$WordToComplete*" }
 }
 
 <#
