@@ -1,3 +1,5 @@
+#Requires -PSEdition Core
+
 BeforeAll {
     . $PSScriptRoot/../Common/CMake.ps1
 }
