@@ -8,6 +8,8 @@ attempt at such tooling.
 At the minute the PowerShell module simply surfaces the ability to configure and build using CMake. By leveraging the
 CMake file API, the module is able to offer tab-completion when specifying targets to build.
 
+![build status](https://github.com/MarkSchofield/PSCMake/actions/workflows/ci.yaml/badge.svg)
+
 ## Installation
 
 To install the module, use PowerShell's `Import-Module` CmdLet:
@@ -21,10 +23,11 @@ warnings when importing the module.
 
 ## Usage
 
-The module provides two commands:
+The module provides the following commands:
 
 1. `Configure-CMakeBuild` - To run CMake configuration for a given preset
 2. `Build-CMakeBuild` - To run a CMake build.
+3. `Write-CMakeBuild` - To output the CMake build as a DOT graph.
 
 Running `Build-CMakeBuild` by itself would run the first `buildConfiguration`. Run either command with `-?` to get more
 details.
