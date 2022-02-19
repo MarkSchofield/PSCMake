@@ -8,7 +8,7 @@ attempt at such tooling.
 At the minute the PowerShell module simply surfaces the ability to configure and build using CMake. By leveraging the
 CMake file API, the module is able to offer tab-completion when specifying targets to build.
 
-![build status](https://github.com/MarkSchofield/PSCMake/actions/workflows/ci.yaml/badge.svg)
+[![build status](https://github.com/MarkSchofield/PSCMake/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/MarkSchofield/PSCMake/actions/workflows/ci.yaml?query=branch%3Amain)
 
 ## Installation
 
