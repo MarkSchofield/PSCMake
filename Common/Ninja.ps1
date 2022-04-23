@@ -113,3 +113,27 @@ function Report-NinjaBuild {
         }
 }
 
+function Download-Ninja {
+    param(
+        [string] $OutputPath
+    )
+    $NinjaVersion = '1.10.2'
+    $NinjaArchiveUrl = "https://github.com/ninja-build/ninja/releases/download/v$NinjaVersion/ninja-win.zip"
+    $NinjaArchivePath = Join-Path -Path $OutputPath -ChildPath 'ninja-win.zip'
+    $NinjaArchiveSha256Hash = 'BBDE850D247D2737C5764C927D1071CBB1F1957DCABDA4A130FA8547C12C695F'
+    $NinjaExecutablePath = Join-Path -Path $OutputPath -ChildPath 'ninja.exe'
+
+    if (-not (IsUpToDate $NinjaExecutablePath $NinjaArchivePath)) {
+        Write-Verbose "Installing Ninja $NinjaVersion"
+        if (-not (IsUpToDate $NinjaArchivePath)) {
+            DownloadFile $NinjaArchiveUrl $NinjaArchivePath
+            if ($NinjaArchiveSha256Hash -ne (Get-FileHash -Path $NinjaArchivePath -Algorithm SHA256).Hash) {
+                Remove-Item -Force -Path $NinjaArchivePath
+                Write-Error "Invalid Hash"
+            }
+        }
+        Expand-Archive -Path $NinjaArchivePath -DestinationPath $OutputPath -Force
+        Touch $NinjaExecutablePath
+    }
+    Get-Item -Path $NinjaExecutablePath
+}
