@@ -207,7 +207,7 @@ function Build-CMakeBuild {
         [string[]] $Presets,
 
         [Parameter(Position = 1)]
-        [string[]] $Configurations,
+        [string[]] $Configurations = @($null),
 
         [Parameter(Position = 2)]
         [string[]] $Targets,
@@ -253,20 +253,11 @@ function Build-CMakeBuild {
 
         Write-Verbose "CMake Arguments: $CMakeArguments"
 
-        if (-not $Configurations) {
+        foreach ($Configuration in $Configurations) {
             $StartTime = [datetime]::Now
-            & $CMake @CMakeArguments
+            & $CMake @CMakeArguments (($Configuration)?('--config', $Configuration):$null)
             if ($Report) {
                 Report-NinjaBuild (Join-Path $BinaryDirectory '.ninja_log') $StartTime
-            }
-        }
-        else {
-            foreach ($Configuration in $Configurations) {
-                $StartTime = [datetime]::Now
-                & $CMake @CMakeArguments '--config' $Configuration
-                if ($Report) {
-                    Report-NinjaBuild (Join-Path $BinaryDirectory '.ninja_log') $StartTime
-                }
             }
         }
     }
