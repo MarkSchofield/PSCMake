@@ -53,3 +53,43 @@ function ColorInterpolation{
 
     [System.Drawing.Color]::FromArgb($Alpha, $Red, $Green, $Blue)
 }
+
+<#
+ .Synopsis
+  Checks whether the given file is newer than any subsequently specified files.
+#>
+function IsUpToDate($Target) {
+    $Dependencies = $args
+
+    $TargetItem = Get-Item -Path $Target -ErrorAction SilentlyContinue
+    if (-not $TargetItem) {
+        return $false;
+    }
+
+    foreach ($Dependency in $Dependencies) {
+        $DependentItem = Get-Item -Path $Dependency -ErrorAction SilentlyContinue
+        if ((-not $DependentItem) -or ($DependentItem.LastWriteTime -gt $TargetItem.LastWriteTime)) {
+            return $false;
+        }
+    }
+
+    $true
+}
+
+function Stash-Location($Location, $Scriptlet) {
+    Push-Location -Path $Location
+    try {
+        & $Scriptlet
+    } finally {
+        Pop-Location
+    }
+}
+
+function Touch($Item) {
+    Write-Verbose "Touch: $Item"
+    (Get-Item $Item).LastWriteTime = Get-Date
+}
+
+function DownloadFile([string] $Url, [string] $DownloadPath) {
+    [System.Net.WebClient]::new().DownloadFile($Url, $DownloadPath)
+}

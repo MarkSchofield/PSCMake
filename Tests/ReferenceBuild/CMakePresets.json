@@ -1,0 +1,66 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [{
+      "name": "ninja",
+      "hidden": true,
+      "generator": "Ninja Multi-Config"
+    },
+    {
+      "name": "windows",
+      "inherits": "ninja",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER_FORCED": "true"
+      }
+    },
+    {
+      "name": "windows-x64",
+      "inherits": "windows",
+      "description": "windows-x64",
+      "displayName": "windows-x64",
+      "binaryDir": "${sourceDir}/__output/${presetName}",
+      "cacheVariables": {
+        "CMAKE_SYSTEM_PROCESSOR": "x64",
+        "CMAKE_SYSTEM_VERSION": "10.0.19041.0"
+      },
+      "environment": {}
+    },
+    {
+      "name": "windows-arm",
+      "inherits": "windows",
+      "description": "windows-arm",
+      "displayName": "windows-arm",
+      "binaryDir": "${sourceDir}/__output/${presetName}",
+      "cacheVariables": {
+        "CMAKE_SYSTEM_PROCESSOR": "arm",
+        "CMAKE_SYSTEM_VERSION": "10.0.19041.0"
+      },
+      "environment": {}
+    }
+  ],
+  "buildPresets": [{
+      "name": "windows-x64",
+      "configurePreset": "windows-x64"
+    },
+    {
+      "name": "windows-arm",
+      "configurePreset": "windows-arm"
+    }
+  ],
+  "testPresets": [{
+    "name": "windows-x64",
+    "configurePreset": "windows-x64",
+    "output": {
+      "outputOnFailure": true
+    },
+    "execution": {
+      "noTestsAction": "error",
+      "stopOnFailure": true
+    }
+  }]
+}
