@@ -84,14 +84,21 @@ function BuildTargetsCompleter {
         $FakeBoundParameters
     )
     $CMakePresetsJson = GetCMakePresets -Silent
-    $Preset = $FakeBoundParameters.Presets | Select-Object -First 1
-    $BuildPreset, $ConfigurePreset = ResolvePresets $CMakePresetsJson 'buildPresets' $Preset
+    $PresetNames = GetBuildPresetNames $CMakePresetsJson
+    $PresetName = $FakeBoundParameters['Presets'] ?? $PresetNames |
+        Select-Object -First 1
+    $BuildPreset, $ConfigurePreset = ResolvePresets $CMakePresetsJson 'buildPresets' $PresetName
     $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
     $CMakeCodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
 
-    # TODO: Rather than picking the first configuration, see of the $FakeBoundParameters has a Configuration, or if the
-    # build preset has a configuration
-    $CMakeCodeModel.configurations[0].targets.name | Where-Object { $_ -ilike "$WordToComplete*" }
+    # TODO: See if the $BuildPreset has a configuration.
+    $ConfigurationName = $FakeBoundParameters['Configurations'] ?? $CMakeCodeModel.configurations.Name |
+        Select-Object -First 1
+    $ConfigurationsJson = $CMakeCodeModel.configurations |
+        Where-Object -Property 'name' -EQ $ConfigurationName
+    $TargetNames = $ConfigurationsJson.targets.name
+    $TargetNames |
+        Where-Object { $_ -ilike "$WordToComplete*" }
 }
 
 <#
