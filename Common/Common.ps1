@@ -76,7 +76,7 @@ function IsUpToDate($Target) {
     $true
 }
 
-function Stash-Location($Location, $Scriptlet) {
+function Using-Location($Location, $Scriptlet) {
     Push-Location -Path $Location
     try {
         & $Scriptlet
