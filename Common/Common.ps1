@@ -27,7 +27,7 @@ Set-StrictMode -Version Latest
 
 function Get-MemberValue {
     [CmdletBinding()]
-    param (
+    param(
         $InputObject,
         $Name,
         $Or = $null

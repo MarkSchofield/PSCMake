@@ -131,7 +131,7 @@ function GetCMake {
 }
 
 function ResolvePresets {
-    param (
+    param(
         $CMakePresetsJson,
 
         [ValidateSet('buildPresets', 'testPresets')]
@@ -198,7 +198,7 @@ function GetBinaryDirectory {
 
 function Enable-CMakeBuildQuery {
     [CmdletBinding()]
-    param (
+    param(
         [string] $BinaryDirectory,
 
         [ValidateSet('codemodel-v2', 'cache-v2', 'cmakeFiles-v1', 'toolchains-v1')]
@@ -214,14 +214,14 @@ function Enable-CMakeBuildQuery {
 }
 
 function Get-CMakeBuildCodeModelDirectory {
-    param (
+    param(
         [string] $BinaryDirectory
     )
     Join-Path -Path $BinaryDirectory -ChildPath '.cmake/api/v1/reply'
 }
 
 function Get-CMakeBuildCodeModel {
-    param (
+    param(
         [string] $BinaryDirectory
     )
     Get-ChildItem -Path (Get-CMakeBuildCodeModelDirectory $BinaryDirectory) -File -Filter 'codemodel-v2-*' |

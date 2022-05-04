@@ -133,7 +133,7 @@ function ConfigurePresetsCompleter {
 #>
 function Configure-CMakeBuild {
     [CmdletBinding()]
-    param (
+    param(
         [Parameter()]
         [string[]] $Presets
     )
@@ -202,7 +202,7 @@ function Configure-CMakeBuild {
 #>
 function Build-CMakeBuild {
     [CmdletBinding()]
-    param (
+    param(
         [Parameter(Position = 0)]
         [string[]] $Presets,
 
@@ -264,7 +264,7 @@ function Build-CMakeBuild {
 }
 
 function Write-CMakeBuild {
-    param (
+    param(
         [Parameter(Position = 0)]
         [string] $Preset,
 
