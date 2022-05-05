@@ -28,21 +28,27 @@ $ErrorActionPreference = 'Stop'
 
 . $PSScriptRoot/Common.ps1
 
-$script:PreviousLocation = $null
+$PreviousLocation = $null
+$CMakeCandidates = @(
+    (Get-Command 'cmake' -ErrorAction SilentlyContinue)
+    if ($IsWindows) {
+        (Join-Path -Path $env:ProgramFiles -ChildPath 'CMake/bin/cmake.exe')
+    }
+)
 
 <#
  .Synopsis
-  Finds a 'CMakePresets.json' file in the current folder, or an ancestral folder.
+  Finds the root of the CMake build - the current or ancestral folder containing a 'CMakePresets.json' file.
 #>
-function FindPresetsPath {
-    $CurrentPath = (Get-Location).Path
-    while ($CurrentPath.Length -ne 0) {
-        $CandidatePath = Join-Path -Path $CurrentPath -ChildPath 'CMakePresets.json'
-        if (Test-Path -PathType Leaf -Path $CandidatePath) {
-            return $CandidatePath
-        }
-        $CurrentPath = Split-Path $CurrentPath
+function FindCMakeRoot {
+    $CurrentLocation = (Get-Location).Path
+    if ($CurrentLocation -ne $script:PreviousLocation) {
+        Write-Verbose "PreviousLocation = $script:PreviousLocation"
+        Write-Verbose "CurrentLocation = $CurrentLocation"
+        $script:PreviousLocation = $CurrentLocation
+        $script:CMakeRoot = GetPathOfFileAbove $CurrentLocation 'CMakePresets.json'
     }
+    $script:CMakeRoot
 }
 
 <#
@@ -53,24 +59,16 @@ function GetCMakePresets {
     param(
         [switch] $Silent
     )
-    $CurrentLocation = (Get-Location).Path
-    if ($CurrentLocation -ne $script:PreviousLocation) {
-        Write-Verbose "PreviousLocation = $script:PreviousLocation"
-        Write-Verbose "CurrentLocation = $CurrentLocation"
-
-        $script:PreviousLocation = $CurrentLocation
-        $script:CMakePresetsPath = FindPresetsPath
-        if (-not $script:CMakePresetsPath) {
-            if ($Silent) {
-                $script:CMakePresetsJson = $null
-                return $script:CMakePresetsJson
-            }
-            Write-Error "Can't find CMakePresets.json"
+    $CMakeRoot = FindCMakeRoot
+    if (-not $CMakeRoot) {
+        if ($Silent) {
+            return $null
         }
-        Write-Verbose "Presets = $script:CMakePresetsPath"
-        $script:CMakePresetsJson = Get-Content $script:CMakePresetsPath | ConvertFrom-Json
+        Write-Error "Can't find CMakePresets.json"
     }
-    $script:CMakePresetsJson
+    $script:CMakePresetsPath = Join-Path -Path $CMakeRoot -ChildPath 'CMakePresets.json'
+    Write-Verbose "Presets = $CMakePresetsPath"
+    Get-Content $CMakePresetsPath | ConvertFrom-Json
 }
 
 <#
@@ -110,12 +108,6 @@ function GetConfigurePresetNames {
 function GetCMake {
     $CMake = Get-Variable -Name 'CMake' -ValueOnly -Scope global -ErrorAction SilentlyContinue
     if (-not $CMake) {
-        $CMakeCandidates = @(
-            (Get-Command 'cmake' -ErrorAction SilentlyContinue)
-            if ($IsWindows) {
-                (Join-Path -Path $env:ProgramFiles -ChildPath 'CMake/bin/cmake.exe')
-            }
-        )
         foreach ($CMakeCandidate in $CMakeCandidates) {
             $CMake = Get-Command $CMakeCandidate -ErrorAction SilentlyContinue
             if ($CMake) {
@@ -131,7 +123,7 @@ function GetCMake {
 }
 
 function ResolvePresets {
-    param (
+    param(
         $CMakePresetsJson,
 
         [ValidateSet('buildPresets', 'testPresets')]
@@ -198,7 +190,7 @@ function GetBinaryDirectory {
 
 function Enable-CMakeBuildQuery {
     [CmdletBinding()]
-    param (
+    param(
         [string] $BinaryDirectory,
 
         [ValidateSet('codemodel-v2', 'cache-v2', 'cmakeFiles-v1', 'toolchains-v1')]
@@ -214,14 +206,14 @@ function Enable-CMakeBuildQuery {
 }
 
 function Get-CMakeBuildCodeModelDirectory {
-    param (
+    param(
         [string] $BinaryDirectory
     )
     Join-Path -Path $BinaryDirectory -ChildPath '.cmake/api/v1/reply'
 }
 
 function Get-CMakeBuildCodeModel {
-    param (
+    param(
         [string] $BinaryDirectory
     )
     Get-ChildItem -Path (Get-CMakeBuildCodeModelDirectory $BinaryDirectory) -File -Filter 'codemodel-v2-*' |

@@ -45,7 +45,7 @@ BeforeAll {
 
 Describe 'BuildTargetsCompleter' {
     It 'Returns the targets of the default preset, default configuration when neither is specified' {
-        Stash-Location "$PSScriptRoot/ReferenceBuild" {
+        Using-Location "$PSScriptRoot/ReferenceBuild" {
             $Completions = Get-CommandCompletions "Build-CMakeBuild -Targets "
 
             $Completions.CompletionMatches.Count | Should -Be 3

@@ -133,10 +133,11 @@ function ConfigurePresetsCompleter {
 #>
 function Configure-CMakeBuild {
     [CmdletBinding()]
-    param (
+    param(
         [Parameter()]
         [string[]] $Presets
     )
+    $CMakeRoot = FindCMakeRoot
     $CMakePresetsJson = GetCMakePresets
     $PresetNames = GetConfigurePresetNames $CMakePresetsJson
     if (-not $Presets) {
@@ -145,27 +146,29 @@ function Configure-CMakeBuild {
     }
 
     $CMake = GetCMake
-    foreach ($Preset in $Presets) {
-        Write-Output "Preset: $Preset"
+    Using-Location $CMakeRoot {
+        foreach ($Preset in $Presets) {
+            Write-Output "Preset: $Preset"
 
-        $ConfigurePreset = $CMakePresetsJson.configurePresets | Where-Object { $_.name -eq $Preset }
-        if (-not $ConfigurePreset) {
-            Write-Error "Unable to find configuration preset '$Preset' in $script:CMakePresetsPath"
-        }
-
-        $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
-        Enable-CMakeBuildQuery $BinaryDirectory
-
-        $CMakeArguments = @(
-            '--preset', $Preset
-            if ($VerbosePreference) {
-                '--log-level=VERBOSE'
+            $ConfigurePreset = $CMakePresetsJson.configurePresets | Where-Object { $_.name -eq $Preset }
+            if (-not $ConfigurePreset) {
+                Write-Error "Unable to find configuration preset '$Preset' in $script:CMakePresetsPath"
             }
-        )
 
-        Write-Verbose "CMake Arguments: $CMakeArguments"
+            $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
+            Enable-CMakeBuildQuery $BinaryDirectory
 
-        & $CMake @CMakeArguments
+            $CMakeArguments = @(
+                '--preset', $Preset
+                if ($VerbosePreference) {
+                    '--log-level=VERBOSE'
+                }
+            )
+
+            Write-Verbose "CMake Arguments: $CMakeArguments"
+
+            & $CMake @CMakeArguments
+        }
     }
 }
 
@@ -202,12 +205,12 @@ function Configure-CMakeBuild {
 #>
 function Build-CMakeBuild {
     [CmdletBinding()]
-    param (
+    param(
         [Parameter(Position = 0)]
         [string[]] $Presets,
 
         [Parameter(Position = 1)]
-        [string[]] $Configurations,
+        [string[]] $Configurations = @($null),
 
         [Parameter(Position = 2)]
         [string[]] $Targets,
@@ -218,6 +221,7 @@ function Build-CMakeBuild {
         [Parameter()]
         [switch] $Report
     )
+    $CMakeRoot = FindCMakeRoot
     $CMakePresetsJson = GetCMakePresets
     $PresetNames = GetBuildPresetNames $CMakePresetsJson
 
@@ -230,40 +234,33 @@ function Build-CMakeBuild {
     }
 
     $CMake = GetCMake
-    foreach ($Preset in $Presets) {
-        $BuildPreset, $ConfigurePreset = ResolvePresets $CMakePresetsJson 'buildPresets' $Preset
-        $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
-        $CMakeCacheFile = Join-Path -Path $BinaryDirectory -ChildPath 'CMakeCache.txt'
+    Using-Location $CMakeRoot {
+        foreach ($Preset in $Presets) {
+            $BuildPreset, $ConfigurePreset = ResolvePresets $CMakePresetsJson 'buildPresets' $Preset
+            $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
+            $CMakeCacheFile = Join-Path -Path $BinaryDirectory -ChildPath 'CMakeCache.txt'
 
-        # Run CMake configure if;
-        #  1) "$BinaryDirectory/CMakeCache.txt" doesn't exist
-        #  2) '-configure' was specified
-        if ((-not (Test-Path -Path $CMakeCacheFile -PathType Leaf)) -or
-            $Configure) {
-            Configure-CMakeBuild -Presets $BuildPreset.configurePreset
-        }
-
-        $CMakeArguments = @(
-            '--build'
-            '--preset', $Preset
-            if ($Targets) {
-                '--target', $Targets
+            # Run CMake configure if;
+            #  1) "$BinaryDirectory/CMakeCache.txt" doesn't exist
+            #  2) '-configure' was specified
+            if ((-not (Test-Path -Path $CMakeCacheFile -PathType Leaf)) -or
+                $Configure) {
+                Configure-CMakeBuild -Presets $ConfigurePreset.name
             }
-        )
 
-        Write-Verbose "CMake Arguments: $CMakeArguments"
+            $CMakeArguments = @(
+                '--build'
+                '--preset', $Preset
+                if ($Targets) {
+                    '--target', $Targets
+                }
+            )
 
-        if (-not $Configurations) {
-            $StartTime = [datetime]::Now
-            & $CMake @CMakeArguments
-            if ($Report) {
-                Report-NinjaBuild (Join-Path $BinaryDirectory '.ninja_log') $StartTime
-            }
-        }
-        else {
+            Write-Verbose "CMake Arguments: $CMakeArguments"
+
             foreach ($Configuration in $Configurations) {
                 $StartTime = [datetime]::Now
-                & $CMake @CMakeArguments '--config' $Configuration
+                & $CMake @CMakeArguments (($Configuration)?('--config', $Configuration):$null)
                 if ($Report) {
                     Report-NinjaBuild (Join-Path $BinaryDirectory '.ninja_log') $StartTime
                 }
@@ -273,7 +270,7 @@ function Build-CMakeBuild {
 }
 
 function Write-CMakeBuild {
-    param (
+    param(
         [Parameter(Position = 0)]
         [string] $Preset,
 
