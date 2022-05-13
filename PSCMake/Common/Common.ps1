@@ -24,6 +24,7 @@
 #Requires -PSEdition Core
 
 Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
 
 function Get-MemberValue {
     [CmdletBinding()]
