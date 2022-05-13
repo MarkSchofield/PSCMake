@@ -2,7 +2,7 @@
 
 BeforeAll {
     . $PSScriptRoot/TestUtilities.ps1
-    Import-Module -Force $PSScriptRoot/../PSCMake.psd1 -DisableNameChecking
+    Import-Module -Force $PSScriptRoot/../PSCMake/PSCMake.psd1 -DisableNameChecking
 
     $CMakePresetsJson = Get-Content (Join-Path -Path $PSScriptRoot -ChildPath 'CMakePresets.Single.json') |
         ConvertFrom-Json
