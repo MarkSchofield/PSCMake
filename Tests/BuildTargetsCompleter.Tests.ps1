@@ -5,8 +5,8 @@ $ErrorActionPreference = 'Stop'
 
 BeforeAll {
     . $PSScriptRoot/TestUtilities.ps1
-    . $PSScriptRoot/../Common/CMake.ps1
-    . $PSScriptRoot/../Common/Ninja.ps1
+    . $PSScriptRoot/../PSCMake/Common/CMake.ps1
+    . $PSScriptRoot/../PSCMake/Common/Ninja.ps1
 
     # Get ninja.exe
     $NinjaCommand = Get-Command 'ninja.exe' -ErrorAction SilentlyContinue
@@ -40,7 +40,7 @@ BeforeAll {
         "-DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER" `
         "-DCMAKE_MAKE_PROGRAM=$CMAKE_MAKE_PROGRAM"
 
-    Import-Module -Force $PSScriptRoot/../PSCMake.psd1 -DisableNameChecking
+    Import-Module -Force $PSScriptRoot/../PSCMake/PSCMake.psd1 -DisableNameChecking
 }
 
 Describe 'BuildTargetsCompleter' {

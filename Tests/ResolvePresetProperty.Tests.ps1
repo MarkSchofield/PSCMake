@@ -1,7 +1,7 @@
 #Requires -PSEdition Core
 
 BeforeAll {
-    . $PSScriptRoot/../Common/CMake.ps1
+    . $PSScriptRoot/../PSCMake/Common/CMake.ps1
 }
 
 Describe 'ResolvePresetProperty' {
