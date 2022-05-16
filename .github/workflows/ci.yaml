@@ -2,7 +2,11 @@ name: PSCMake CI
 on:
   push:
     branches:
+      - develop
+      - feature/*
       - main
+      - release/*
+      - support/*
     paths-ignore:
       - '.vscode/**'
       - 'README.md'
