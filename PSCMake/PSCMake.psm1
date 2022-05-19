@@ -30,6 +30,22 @@ $ErrorActionPreference = 'Stop'
 . $PSScriptRoot/Common/Common.ps1
 . $PSScriptRoot/Common/Ninja.ps1
 
+$OptionsPath = Join-Path -Path (GetHomePath) -ChildPath '.pscmake/options'
+$Options = $Null
+
+function LoadOptions {
+    if (-not $Script:Options) {
+        $Script:Options = @{
+            ImplicitScoping = $False
+        }
+        if (Test-Path -Path $OptionsPath) {
+            $Script:Options = Get-Content |
+                ConvertFrom-Json
+        }
+    }
+    $Script:Options
+}
+
 <#
     .Synopsis
     Invokes an executable.
@@ -555,6 +571,23 @@ function Invoke-CMakeOutput {
     Write-Output "Running: $TargetPath $Arguments"
     Write-Output '----'
     InvokeExecutable $TargetPath $Arguments
+}
+
+function Get-PSCMakeOption {
+    param(
+        [Parameter(Position = 0)]
+        [string] $Name
+    )
+}
+
+function Set-PSCMakeOption {
+    param(
+        [Parameter(Position = 0)]
+        [string] $Name,
+
+        [Parameter(Position = 1)]
+        $Value
+    )
 }
 
 Register-ArgumentCompleter -CommandName Invoke-CMakeOutput -ParameterName Preset -ScriptBlock $function:BuildPresetsCompleter
