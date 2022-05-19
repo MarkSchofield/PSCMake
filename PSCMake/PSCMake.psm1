@@ -30,6 +30,7 @@ $ErrorActionPreference = 'Stop'
 . $PSScriptRoot/Common/Common.ps1
 . $PSScriptRoot/Common/Includes.ps1
 . $PSScriptRoot/Common/Ninja.ps1
+. $PSScriptRoot/Common/Options.ps1
 
 <#
     .Synopsis
@@ -49,6 +50,20 @@ function InvokeExecutable {
 
 <#
     .Synopsis
+    Provides feedback during argument completion.
+#>
+function ArgumentCompleterFeedback {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '', Justification = 'Required by the implementation')]
+    param(
+        $Message
+    )
+    if ((LoadOptions).ArgumentCompleterFeedback -and (IsVirtualTerminalProcessingEnabled)) {
+        Write-Host -NoNewline "`eD`eD`eM`eM`e[s`n`e[0K`e[31mArgumentCompleter: $Message`e[0m`e[u"
+    }
+}
+
+<#
+    .Synopsis
     An argument-completer for `Build-CMakeBuild`'s `-Preset` parameter.
 #>
 function BuildPresetsCompleter {
@@ -63,10 +78,15 @@ function BuildPresetsCompleter {
     $null = $ParameterName
     $null = $CommandAst
     $null = $FakeBoundParameters
-    $CMakePresetsJson = GetCMakePresets -Silent
-    GetBuildPresets $CMakePresetsJson |
-        Select-Object -ExpandProperty 'name' |
-        Where-Object { $_ -ilike "$WordToComplete*" }
+    try {
+        $CMakePresetsJson = GetCMakePresets -Silent
+        GetBuildPresets $CMakePresetsJson |
+            Select-Object -ExpandProperty 'name' |
+            Where-Object { $_ -ilike "$WordToComplete*" }
+    } catch {
+        ArgumentCompleterFeedback $_
+        @('')
+    }
 }
 
 <#
@@ -91,12 +111,17 @@ function BuildConfigurationsCompleter {
     #   * If not, look for a code model and use that.
     #   * If not, look at the configure preset and see if CMAKE_CONFIGURATION_TYPES is set, and use that array.
     #   * Otherwise default to Release, Debug, RelWithDebInfo, MinSizeRel
-    @(
-        'Release'
-        'Debug'
-        'RelWithDebInfo'
-        'MinSizeRel'
-    ) | Where-Object { $_ -ilike "$WordToComplete*" }
+    try {
+        @(
+            'Release'
+            'Debug'
+            'RelWithDebInfo'
+            'MinSizeRel'
+        ) | Where-Object { $_ -ilike "$WordToComplete*" }
+    } catch {
+        ArgumentCompleterFeedback $_
+        @('')
+    }
 }
 
 <#
@@ -114,35 +139,43 @@ function BuildTargetsCompleter {
     $null = $CommandName
     $null = $ParameterName
     $null = $CommandAst
-    $CMakePresetsJson = GetCMakePresets -Silent
-    $BuildPreset = GetMatchingBuildPresets $CMakePresetsJson $FakeBoundParameters['Preset'] |
-        Select-Object -First 1
-    $ConfigurePreset = GetConfigurePresetFor $CMakePresetsJson $BuildPreset
-    $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
-    $CMakeCodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
+    try {
+        $CMakePresetsJson = GetCMakePresets -Silent
+        $BuildPreset = GetMatchingBuildPresets $CMakePresetsJson $FakeBoundParameters['Preset'] |
+            Select-Object -First 1
+        $ConfigurePreset = GetConfigurePresetFor $CMakePresetsJson $BuildPreset
+        $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
+        $CMakeCodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
+        if (-not $CMakeCodeModel) {
+            throw "Failed to get CMake code model from '$BinaryDirectory'"
+        }
 
-    # TODO: See if the $BuildPreset has a configuration.
-    $ConfigurationName = $FakeBoundParameters['Configuration'] ?? $CMakeCodeModel.configurations.Name |
-        Select-Object -First 1
-    $ConfigurationsJson = $CMakeCodeModel.configurations |
-        Where-Object -Property 'name' -EQ $ConfigurationName
-    $TargetNames = $ConfigurationsJson.targets.name
+        # TODO: See if the $BuildPreset has a configuration.
+        $ConfigurationName = $FakeBoundParameters['Configuration'] ?? $CMakeCodeModel.configurations.Name |
+            Select-Object -First 1
+        $ConfigurationsJson = $CMakeCodeModel.configurations |
+            Where-Object -Property 'name' -EQ $ConfigurationName
+        $TargetNames = $ConfigurationsJson.targets.name
 
-    # Add standard CMake targets 'all', 'clean', 'install'
-    $TargetNames += @(
-        'all'
-        'clean'
-        'install'
-    )
+        # Add standard CMake targets 'all', 'clean', 'install'
+        $TargetNames += @(
+            'all'
+            'clean'
+            'install'
+        )
 
-    # Add standard CMake target 'test' if 'CTestTestfile.cmake' exists in the binary directory.
-    $CTestFilePath = Join-Path -Path $BinaryDirectory -ChildPath 'CTestTestfile.cmake'
-    if (Test-Path -Path $CTestFilePath -PathType Leaf -ErrorAction SilentlyContinue) {
-        $TargetNames += 'test'
+        # Add standard CMake target 'test' if 'CTestTestfile.cmake' exists in the binary directory.
+        $CTestFilePath = Join-Path -Path $BinaryDirectory -ChildPath 'CTestTestfile.cmake'
+        if (Test-Path -Path $CTestFilePath -PathType Leaf -ErrorAction SilentlyContinue) {
+            $TargetNames += 'test'
+        }
+
+        $TargetNames |
+            Where-Object { $_ -ilike "$WordToComplete*" }
+    } catch {
+        ArgumentCompleterFeedback $_
+        @('')
     }
-
-    $TargetNames |
-        Where-Object { $_ -ilike "$WordToComplete*" }
 }
 
 <#
@@ -160,25 +193,33 @@ function ExecutableTargetsCompleter {
     $null = $CommandName
     $null = $ParameterName
     $null = $CommandAst
-    $CMakePresetsJson = GetCMakePresets -Silent
-    $BuildPreset = GetMatchingBuildPresets $CMakePresetsJson $FakeBoundParameters['Preset'] |
-        Select-Object -First 1
-    $ConfigurePreset = GetConfigurePresetFor $CMakePresetsJson $BuildPreset
-    $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
-    $CMakeCodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
+    try {
+        $CMakePresetsJson = GetCMakePresets -Silent
+        $BuildPreset = GetMatchingBuildPresets $CMakePresetsJson $FakeBoundParameters['Preset'] |
+            Select-Object -First 1
+        $ConfigurePreset = GetConfigurePresetFor $CMakePresetsJson $BuildPreset
+        $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
+        $CMakeCodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
+        if (-not $CMakeCodeModel) {
+            throw "Failed to get CMake code model from '$BinaryDirectory'"
+        }
 
-    # TODO: See if the $BuildPreset has a configuration.
-    $ConfigurationName = $FakeBoundParameters['Configurations'] ?? $CMakeCodeModel.configurations.Name |
-        Select-Object -First 1
-    $ConfigurationsJson = $CMakeCodeModel.configurations |
-        Where-Object -Property 'name' -EQ $ConfigurationName
+        # TODO: See if the $BuildPreset has a configuration.
+        $ConfigurationName = $FakeBoundParameters['Configurations'] ?? $CMakeCodeModel.configurations.Name |
+            Select-Object -First 1
+        $ConfigurationsJson = $CMakeCodeModel.configurations |
+            Where-Object -Property 'name' -EQ $ConfigurationName
 
-    $TargetTuplesCodeModel = $ConfigurationsJson.targets |
-        Where-Object { $_.name -ilike "$WordToComplete*" }
+        $TargetTuplesCodeModel = $ConfigurationsJson.targets |
+            Where-Object { $_.name -ilike "$WordToComplete*" }
 
-    # Use the 'code model' JSON to load the target-specific JSON to filter to targets with 'type' equal to 'EXECUTABLE'
-    $TargetTuples = FilterExecutableTargets (Get-CMakeBuildCodeModelDirectory $BinaryDirectory) $TargetTuplesCodeModel
-    $TargetTuples.name
+        # Use the 'code model' JSON to load the target-specific JSON to filter to targets with 'type' equal to 'EXECUTABLE'
+        $TargetTuples = FilterExecutableTargets (Get-CMakeBuildCodeModelDirectory $BinaryDirectory) $TargetTuplesCodeModel
+        $TargetTuples.name
+    } catch {
+        ArgumentCompleterFeedback $_
+        @('')
+    }
 }
 
 <#
@@ -197,10 +238,15 @@ function ConfigurePresetsCompleter {
     $null = $ParameterName
     $null = $CommandAst
     $null = $FakeBoundParameters
-    $CMakePresetsJson = GetCMakePresets -Silent
-    GetConfigurePresets $CMakePresetsJson |
-        Select-Object -ExpandProperty 'name' |
-        Where-Object { $_ -ilike "$WordToComplete*" }
+    try {
+        $CMakePresetsJson = GetCMakePresets -Silent
+        GetConfigurePresets $CMakePresetsJson |
+            Select-Object -ExpandProperty 'name' |
+            Where-Object { $_ -ilike "$WordToComplete*" }
+    } catch {
+        ArgumentCompleterFeedback $_
+        @('')
+    }
 }
 
 <#
@@ -404,8 +450,7 @@ function Build-CMakeBuild {
                 $Fresh -or
                 (-not (Test-Path -LiteralPath $CMakeCacheFile -PathType Leaf)) -or
                 (-not (Test-Path -LiteralPath (Get-CMakeBuildCodeModelDirectory $BinaryDirectory) -PathType Container)) -or
-                (-not ($CodeModel = Get-CMakeBuildCodeModel $BinaryDirectory))
-                ) {
+                (-not ($CodeModel = Get-CMakeBuildCodeModel $BinaryDirectory))) {
                 ConfigureCMake -CMake $CMake $CMakePresetsJson $ConfigurePreset -Fresh:$Fresh
                 $CodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
             }
