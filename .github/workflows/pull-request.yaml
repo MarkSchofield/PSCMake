@@ -3,11 +3,13 @@ on:
   pull_request:
   workflow_dispatch:
 jobs:
-  run-pester-tests:
+  build:
     runs-on: windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
       - name: Invoke-Pester
         shell: pwsh
         run: |
@@ -22,3 +24,12 @@ jobs:
             }
           }
           Invoke-Pester -Configuration $Configuration
+      - name: Build
+        shell: pwsh
+        run: |
+          & .\Build\Publish.ps1 -Verbose
+      - name: Upload __packages
+        uses: actions/upload-artifact@v2
+        with:
+          name: __packages
+          path: __packages
