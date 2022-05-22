@@ -20,7 +20,9 @@ jobs:
               Passthru = $true
             }
             CodeCoverage = @{
-              Enabled = $false
+              Enabled = $true
+              OutputFormat = 'JaCoCo'
+              OutputPath = '${{ env.GITHUB_WORKSPACE }}/Pester-Coverage.xml'
             }
           }
           Invoke-Pester -Configuration $Configuration

@@ -28,6 +28,15 @@ jobs:
             }
             CodeCoverage = @{
               Enabled = $true
+              OutputFormat = 'JaCoCo'
+              OutputPath = '${{ env.GITHUB_WORKSPACE }}/Pester-Coverage.xml'
             }
           }
           Invoke-Pester -Configuration $Configuration
+      - uses: codecov/codecov-action@v2
+        with:
+          files: '${{ env.GITHUB_WORKSPACE }}/Pester-Coverage.xml'
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: true
+          verbose: true
