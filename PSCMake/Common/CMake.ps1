@@ -197,7 +197,7 @@ function Enable-CMakeBuildQuery {
         [string[]] $ObjectKinds = @('codemodel-v2', 'cache-v2', 'cmakeFiles-v1', 'toolchains-v1')
     )
     $CMakeQueryApiDirectory = Join-Path -Path $BinaryDirectory -ChildPath '.cmake/api/v1/query'
-    $null = mkdir $CMakeQueryApiDirectory -ErrorAction SilentlyContinue
+    $null = New-Item -ItemType Directory -Path $CMakeQueryApiDirectory -Force -ErrorAction SilentlyContinue
     $ObjectKinds |
         ForEach-Object {
             $QueryFile = Join-Path -Path $CMakeQueryApiDirectory -ChildPath $_
