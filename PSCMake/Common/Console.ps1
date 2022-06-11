@@ -61,7 +61,7 @@ public static SafeFileHandle GetConOut()
 '@
 
 $script:Console = $null
-$script:IsVirtualTerminalProcessingEnabled = $null
+$script:IsVirtualTerminalProcessingEnabled = if ($IsWindows) { $null } else { $true }
 
 function GetConsole {
     if (-not $script:Console) {
