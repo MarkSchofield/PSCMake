@@ -174,18 +174,27 @@ function GetBinaryDirectory {
     $BinaryDirectory = ResolvePresetProperty $CMakePresetsJson $ConfigurePreset 'binaryDir'
 
     # Perform macro-replacement
-    $Result = for (; $BinaryDirectory; $BinaryDirectory = $Right) {
-        $Left, $Match, $Right = $BinaryDirectory -split '(\$\w*\{\w+\})', 2
+    $Result = MacroReplacement $BinaryDirectory $ConfigurePreset
+
+    # Canonicalize
+    [System.IO.Path]::GetFullPath($Result)
+}
+
+function MacroReplacement {
+    param(
+        $Value,
+        $PresetJson
+    )
+    $Result = for (; $Value; $Value = $Right) {
+        $Left, $Match, $Right = $Value -split '(\$\w*\{\w+\})', 2
         $Left
         switch -regex ($Match) {
-            '\$\{sourceDir\}' { Split-Path $CMakePresetsPath }
-            '\$\{presetName\}' { $ConfigurePreset.name }
+            '\$\{sourceDir\}' { Split-Path $script:CMakePresetsPath }
+            '\$\{presetName\}' { $PresetJson.name }
             Default {}
         }
     }
-
-    # Canonicalize
-    [System.IO.Path]::GetFullPath($Result -join '')
+    $Result -join ''
 }
 
 function Enable-CMakeBuildQuery {
