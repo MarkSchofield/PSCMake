@@ -180,6 +180,24 @@ function GetBinaryDirectory {
     [System.IO.Path]::GetFullPath($Result)
 }
 
+function GetMacroConstants {
+    $HostSystemName = if ($IsWindows) {
+        'Windows'
+    } elseif ($IsMacOS) {
+        'Darwin'
+    } elseif ($IsLinux) {
+        'Linux'
+    } else {
+        Write-Error "Unsupported `${hostSystemName} value."
+    }
+
+    @{
+        '${hostSystemName}'=$HostSystemName
+        '$vendor{PSCMake}'='true'
+    }
+}
+
+
 function MacroReplacement {
     param(
         $Value,
@@ -189,9 +207,54 @@ function MacroReplacement {
         $Left, $Match, $Right = $Value -split '(\$\w*\{\w+\})', 2
         $Left
         switch -regex ($Match) {
-            '\$\{sourceDir\}' { Split-Path $script:CMakePresetsPath }
-            '\$\{presetName\}' { $PresetJson.name }
-            Default {}
+            '\$\{sourceDir\}' {
+                Split-Path -Path $script:CMakePresetsPath
+                break
+            }
+            '\$\{sourceParentDir\}' {
+                Split-Path -Path (Split-Path -Path $script:CMakePresetsPath)
+                break
+            }
+            '\$\{sourceDirName\}' {
+                Split-Path -Leaf -Path (Split-Path -Path $script:CMakePresetsPath)
+                break
+            }
+            '\$\{presetName\}' {
+                $PresetJson.name
+                break
+            }
+            '\$\{generator\}' {
+                Write-Error "$_ is not yet implemented as a macro replacement."
+                break
+            }
+            '\$\{hostSystemName\}' {
+                (GetMacroConstants).$_
+                break
+            }
+            '\$\{fileDir\}' {
+                Write-Error "$_ is not yet implemented as a macro replacement."
+                break
+            }
+            '\$\{dollar\}' {
+                '$'
+                break
+            }
+            '\$env\{\}' {
+                Write-Error "$_ is not yet implemented as a macro replacement."
+                break
+            }
+            '\$penv\{\}' {
+                Write-Error "$_ is not yet implemented as a macro replacement."
+                break
+            }
+            '\$vendor\{\w+\}' {
+                Get-MemberValue (GetMacroConstants) $_ -Or $_
+                break
+            }
+            Default {
+                $Match
+                break
+            }
         }
     }
     $Result -join ''
