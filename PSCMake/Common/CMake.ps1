@@ -80,9 +80,23 @@ function GetBuildPresetNames {
         $CMakePresetsJson
     )
     if ($CMakePresetsJson) {
-        $CMakePresetsJson.buildPresets |
-            Where-Object { -not (Get-MemberValue -InputObject $_ -Name 'hidden' -Or $false) } |
-            ForEach-Object { $_.name }
+        $Presets = $CMakePresetsJson.buildPresets
+
+        # Filter presets that have '"hidden":true'
+        $Presets = $Presets | Where-Object { -not (Get-MemberValue -InputObject $_ -Name 'hidden' -Or $false) }
+
+        # Filter presets that have (or their ancestors have) conditions that evaluate to $false
+        $Presets = $Presets | Where-Object { EvaluatePresetCondition $_ $CMakePresetsJson.buildPresets }
+
+        # Filter presets that have configure presets that have conditions that evaluate to $false
+        $Presets = $Presets | Where-Object {
+            $BuildPresetJson = $_
+            $ConfigurePresetJson = $CMakePresetsJson.configurePresets |
+                Where-Object { $_.name -eq $BuildPresetJson.configurePreset } |
+                Where-Object { EvaluatePresetCondition $_ $CMakePresetsJson.configurePresets }
+            $null -ne $ConfigurePresetJson
+        }
+        $Presets.name
     }
 }
 
@@ -95,9 +109,15 @@ function GetConfigurePresetNames {
         $CMakePresetsJson
     )
     if ($CMakePresetsJson) {
-        $CMakePresetsJson.configurePresets |
-            Where-Object { -not (Get-MemberValue -InputObject $_ -Name 'hidden' -Or $false) } |
-            ForEach-Object { $_.name }
+        $Presets = $CMakePresetsJson.configurePresets
+
+        # Filter presets that have '"hidden":true'
+        $Presets = $Presets | Where-Object { -not (Get-MemberValue -InputObject $_ -Name 'hidden' -Or $false) }
+
+        # Filter presets that have (or their ancestors have) conditions that evaluate to $false
+        $Presets = $Presets | Where-Object { EvaluatePresetCondition $_ $CMakePresetsJson.configurePresets }
+
+        $Presets.name
     }
 }
 
@@ -138,7 +158,7 @@ function ResolvePresets {
 
     $ConfigurePresetJson = $CMakePresetsJson.configurePresets | Where-Object { $_.name -eq $PresetJson.configurePreset }
     if (-not $ConfigurePresetJson) {
-        Write-Error "Unable to find configuration preset '$($PresetJson.configurePreset)' in $script:CMakePresetsPath"
+        Write-Error "Unable to find configure preset '$($PresetJson.configurePreset)' in $script:CMakePresetsPath"
     }
 
     $PresetJson, $ConfigurePresetJson
@@ -157,12 +177,81 @@ function ResolvePresetProperty {
             return $PropertyValue
         }
 
-        $BasePreset = $Preset.inherits
+        $BasePreset = Get-MemberValue $Preset 'inherits'
         if (-not $BasePreset) {
             break
         }
 
         $Preset = $CMakePresetsJson.configurePresets | Where-Object { $_.name -eq $BasePreset } | Select-Object -First 1
+    }
+}
+
+function EvaluatePresetCondition {
+    param(
+        $PresetJson,
+        $PresetsJson
+    )
+
+    $PresetConditionJson = Get-MemberValue $PresetJson 'condition'
+    if ($PresetConditionJson) {
+        if (-not (EvaluateCondition $PresetConditionJson $PresetJson)) {
+            return $false
+        }
+    }
+
+    $BasePresetName = Get-MemberValue $PresetJson 'inherits'
+    if (-not $BasePresetName) {
+        return $true
+    }
+
+    $BasePreset = $PresetsJson | Where-Object { $_.name -eq $BasePresetName } | Select-Object -First 1
+    EvaluatePresetCondition $BasePreset $PresetsJson
+}
+
+function EvaluateCondition {
+    param(
+        $ConditionJson,
+        $PresetJson
+    )
+    switch ($ConditionJson.type)
+    {
+        'equals' {
+            return (MacroReplacement $ConditionJson.lhs $PresetJson) -eq (MacroReplacement $ConditionJson.rhs $PresetJson)
+        }
+        'notEquals' {
+            return (MacroReplacement $ConditionJson.lhs $PresetJson) -ne (MacroReplacement $ConditionJson.rhs $PresetJson)
+        }
+        'const' {
+            Write-Error "$_ is not yet implemented as a condition type."
+            return
+        }
+        'inList' {
+            Write-Error "$_ is not yet implemented as a condition type."
+            return
+        }
+        'notInList' {
+            Write-Error "$_ is not yet implemented as a condition type."
+            return
+        }
+        'matches' {
+            Write-Error "$_ is not yet implemented as a condition type."
+            return
+        }
+        'notMatches' {
+            Write-Error "$_ is not yet implemented as a condition type."
+            return
+        }
+        'anyOf' {
+            Write-Error "$_ is not yet implemented as a condition type."
+            return
+        }
+        'allOf' {
+            Write-Error "$_ is not yet implemented as a condition type."
+            return
+        }
+        'not' {
+            return -not (EvaluateCondition $ConditionJson.condition PresetJson)
+        }
     }
 }
 
@@ -196,7 +285,6 @@ function GetMacroConstants {
         '$vendor{PSCMake}'='true'
     }
 }
-
 
 function MacroReplacement {
     param(
