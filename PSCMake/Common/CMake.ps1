@@ -80,9 +80,23 @@ function GetBuildPresetNames {
         $CMakePresetsJson
     )
     if ($CMakePresetsJson) {
-        $CMakePresetsJson.buildPresets |
-            Where-Object { -not (Get-MemberValue -InputObject $_ -Name 'hidden' -Or $false) } |
-            ForEach-Object { $_.name }
+        $Presets = $CMakePresetsJson.buildPresets
+
+        # Filter presets that have '"hidden":true'
+        $Presets = $Presets | Where-Object { -not (Get-MemberValue -InputObject $_ -Name 'hidden' -Or $false) }
+
+        # Filter presets that have (or their ancestors have) conditions that evaluate to $false
+        $Presets = $Presets | Where-Object { EvaluatePresetCondition $_ $CMakePresetsJson.buildPresets }
+
+        # Filter presets that have configure presets that have conditions that evaluate to $false
+        $Presets = $Presets | Where-Object {
+            $BuildPresetJson = $_
+            $ConfigurePresetJson = $CMakePresetsJson.configurePresets |
+                Where-Object { $_.name -eq $BuildPresetJson.configurePreset } |
+                Where-Object { EvaluatePresetCondition $_ $CMakePresetsJson.configurePresets }
+            $null -ne $ConfigurePresetJson
+        }
+        $Presets.name
     }
 }
 
@@ -95,9 +109,15 @@ function GetConfigurePresetNames {
         $CMakePresetsJson
     )
     if ($CMakePresetsJson) {
-        $CMakePresetsJson.configurePresets |
-            Where-Object { -not (Get-MemberValue -InputObject $_ -Name 'hidden' -Or $false) } |
-            ForEach-Object { $_.name }
+        $Presets = $CMakePresetsJson.configurePresets
+
+        # Filter presets that have '"hidden":true'
+        $Presets = $Presets | Where-Object { -not (Get-MemberValue -InputObject $_ -Name 'hidden' -Or $false) }
+
+        # Filter presets that have (or their ancestors have) conditions that evaluate to $false
+        $Presets = $Presets | Where-Object { EvaluatePresetCondition $_ $CMakePresetsJson.configurePresets }
+
+        $Presets.name
     }
 }
 
@@ -138,7 +158,7 @@ function ResolvePresets {
 
     $ConfigurePresetJson = $CMakePresetsJson.configurePresets | Where-Object { $_.name -eq $PresetJson.configurePreset }
     if (-not $ConfigurePresetJson) {
-        Write-Error "Unable to find configuration preset '$($PresetJson.configurePreset)' in $script:CMakePresetsPath"
+        Write-Error "Unable to find configure preset '$($PresetJson.configurePreset)' in $script:CMakePresetsPath"
     }
 
     $PresetJson, $ConfigurePresetJson
@@ -157,12 +177,81 @@ function ResolvePresetProperty {
             return $PropertyValue
         }
 
-        $BasePreset = $Preset.inherits
+        $BasePreset = Get-MemberValue $Preset 'inherits'
         if (-not $BasePreset) {
             break
         }
 
         $Preset = $CMakePresetsJson.configurePresets | Where-Object { $_.name -eq $BasePreset } | Select-Object -First 1
+    }
+}
+
+function EvaluatePresetCondition {
+    param(
+        $PresetJson,
+        $PresetsJson
+    )
+
+    $PresetConditionJson = Get-MemberValue $PresetJson 'condition'
+    if ($PresetConditionJson) {
+        if (-not (EvaluateCondition $PresetConditionJson $PresetJson)) {
+            return $false
+        }
+    }
+
+    $BasePresetName = Get-MemberValue $PresetJson 'inherits'
+    if (-not $BasePresetName) {
+        return $true
+    }
+
+    $BasePreset = $PresetsJson | Where-Object { $_.name -eq $BasePresetName } | Select-Object -First 1
+    EvaluatePresetCondition $BasePreset $PresetsJson
+}
+
+function EvaluateCondition {
+    param(
+        $ConditionJson,
+        $PresetJson
+    )
+    switch ($ConditionJson.type)
+    {
+        'equals' {
+            return (MacroReplacement $ConditionJson.lhs $PresetJson) -eq (MacroReplacement $ConditionJson.rhs $PresetJson)
+        }
+        'notEquals' {
+            return (MacroReplacement $ConditionJson.lhs $PresetJson) -ne (MacroReplacement $ConditionJson.rhs $PresetJson)
+        }
+        'const' {
+            Write-Error "$_ is not yet implemented as a condition type."
+            return
+        }
+        'inList' {
+            Write-Error "$_ is not yet implemented as a condition type."
+            return
+        }
+        'notInList' {
+            Write-Error "$_ is not yet implemented as a condition type."
+            return
+        }
+        'matches' {
+            Write-Error "$_ is not yet implemented as a condition type."
+            return
+        }
+        'notMatches' {
+            Write-Error "$_ is not yet implemented as a condition type."
+            return
+        }
+        'anyOf' {
+            Write-Error "$_ is not yet implemented as a condition type."
+            return
+        }
+        'allOf' {
+            Write-Error "$_ is not yet implemented as a condition type."
+            return
+        }
+        'not' {
+            return -not (EvaluateCondition $ConditionJson.condition PresetJson)
+        }
     }
 }
 
@@ -174,18 +263,89 @@ function GetBinaryDirectory {
     $BinaryDirectory = ResolvePresetProperty $CMakePresetsJson $ConfigurePreset 'binaryDir'
 
     # Perform macro-replacement
-    $Result = for (; $BinaryDirectory; $BinaryDirectory = $Right) {
-        $Left, $Match, $Right = $BinaryDirectory -split '(\$\w*\{\w+\})', 2
-        $Left
-        switch -regex ($Match) {
-            '\$\{sourceDir\}' { Split-Path $CMakePresetsPath }
-            '\$\{presetName\}' { $ConfigurePreset.name }
-            Default {}
-        }
-    }
+    $Result = MacroReplacement $BinaryDirectory $ConfigurePreset
 
     # Canonicalize
-    [System.IO.Path]::GetFullPath($Result -join '')
+    [System.IO.Path]::GetFullPath($Result)
+}
+
+function GetMacroConstants {
+    $HostSystemName = if ($IsWindows) {
+        'Windows'
+    } elseif ($IsMacOS) {
+        'Darwin'
+    } elseif ($IsLinux) {
+        'Linux'
+    } else {
+        Write-Error "Unsupported `${hostSystemName} value."
+    }
+
+    @{
+        '${hostSystemName}'=$HostSystemName
+        '$vendor{PSCMake}'='true'
+    }
+}
+
+function MacroReplacement {
+    param(
+        $Value,
+        $PresetJson
+    )
+    $Result = for (; $Value; $Value = $Right) {
+        $Left, $Match, $Right = $Value -split '(\$\w*\{\w+\})', 2
+        $Left
+        switch -regex ($Match) {
+            '\$\{sourceDir\}' {
+                Split-Path -Path $script:CMakePresetsPath
+                break
+            }
+            '\$\{sourceParentDir\}' {
+                Split-Path -Path (Split-Path -Path $script:CMakePresetsPath)
+                break
+            }
+            '\$\{sourceDirName\}' {
+                Split-Path -Leaf -Path (Split-Path -Path $script:CMakePresetsPath)
+                break
+            }
+            '\$\{presetName\}' {
+                $PresetJson.name
+                break
+            }
+            '\$\{generator\}' {
+                Write-Error "$_ is not yet implemented as a macro replacement."
+                break
+            }
+            '\$\{hostSystemName\}' {
+                (GetMacroConstants).$_
+                break
+            }
+            '\$\{fileDir\}' {
+                Write-Error "$_ is not yet implemented as a macro replacement."
+                break
+            }
+            '\$\{dollar\}' {
+                '$'
+                break
+            }
+            '\$env\{\}' {
+                Write-Error "$_ is not yet implemented as a macro replacement."
+                break
+            }
+            '\$penv\{\}' {
+                Write-Error "$_ is not yet implemented as a macro replacement."
+                break
+            }
+            '\$vendor\{\w+\}' {
+                Get-MemberValue (GetMacroConstants) $_ -Or $_
+                break
+            }
+            Default {
+                $Match
+                break
+            }
+        }
+    }
+    $Result -join ''
 }
 
 function Enable-CMakeBuildQuery {
