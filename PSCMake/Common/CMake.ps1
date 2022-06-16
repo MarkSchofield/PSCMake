@@ -51,6 +51,16 @@ function FindCMakeRoot {
     $script:CMakeRoot
 }
 
+$script:CMakePresetsPath = $null
+
+<#
+ .Synopsis
+  Gets the path that the most recently loaded CMakePresets.json was loaded from.
+#>
+function GetCMakePresetsPath {
+    $script:CMakePresetsPath
+}
+
 <#
  .Synopsis
   Loads the CMakePresets.json into a PowerShell representation.
@@ -153,12 +163,12 @@ function ResolvePresets {
     )
     $PresetJson = $CMakePresetsJson.$PresetType | Where-Object { $_.name -eq $PresetName }
     if (-not $PresetJson) {
-        Write-Error "Unable to find $PresetType '$Preset' in $script:CMakePresetsPath"
+        Write-Error "Unable to find $PresetType '$Preset' in $(GetCMakePresetsPath)"
     }
 
     $ConfigurePresetJson = $CMakePresetsJson.configurePresets | Where-Object { $_.name -eq $PresetJson.configurePreset }
     if (-not $ConfigurePresetJson) {
-        Write-Error "Unable to find configure preset '$($PresetJson.configurePreset)' in $script:CMakePresetsPath"
+        Write-Error "Unable to find configure preset '$($PresetJson.configurePreset)' in $(GetCMakePresetsPath)"
     }
 
     $PresetJson, $ConfigurePresetJson
@@ -312,15 +322,15 @@ function MacroReplacement {
         $Left
         switch -regex ($Match) {
             '\$\{sourceDir\}' {
-                Split-Path -Path $script:CMakePresetsPath
+                Split-Path -Path (GetCMakePresetsPath)
                 break
             }
             '\$\{sourceParentDir\}' {
-                Split-Path -Path (Split-Path -Path $script:CMakePresetsPath)
+                Split-Path -Path (Split-Path -Path (GetCMakePresetsPath))
                 break
             }
             '\$\{sourceDirName\}' {
-                Split-Path -Leaf -Path (Split-Path -Path $script:CMakePresetsPath)
+                Split-Path -Leaf -Path (Split-Path -Path (GetCMakePresetsPath))
                 break
             }
             '\$\{presetName\}' {
