@@ -244,8 +244,12 @@ function EvaluateCondition {
             return
         }
         'allOf' {
-            Write-Error "$_ is not yet implemented as a condition type."
-            return
+            foreach ($NestedCondition in $ConditionJson.conditions) {
+                if (-not (EvaluateCondition $NestedCondition $PresetJson)) {
+                    return $false
+                }
+            }
+            return $true
         }
         'not' {
             return -not (EvaluateCondition $ConditionJson.condition $PresetJson)

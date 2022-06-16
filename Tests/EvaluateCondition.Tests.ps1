@@ -100,6 +100,44 @@ Describe 'EvaluateCondition' {
         EvaluateCondition $MatchingCondition $null | Should -Be $false
     }
 
+    It 'Can evaluate "allOf" conditions' {
+        $PresetJson = @{}
+        $Condition = @'
+        {
+            "type": "allOf",
+            "conditions": [
+                { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" }
+            ]
+        }
+'@ | ConvertFrom-Json
+
+        EvaluateCondition $Condition $PresetJson | Should -Be $true
+
+        $Condition = @'
+        {
+            "type": "allOf",
+            "conditions": [
+                { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" },
+                { "type": "equals", "lhs": "$vendor{PSCMake}", "rhs": "true" }
+            ]
+        }
+'@ | ConvertFrom-Json
+
+        EvaluateCondition $Condition $PresetJson | Should -Be $true
+
+        $Condition = @'
+        {
+            "type": "allOf",
+            "conditions": [
+                { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" },
+                { "type": "equals", "lhs": "$vendor{PSCMake}", "rhs": "false" }
+            ]
+        }
+'@ | ConvertFrom-Json
+
+        EvaluateCondition $Condition $PresetJson | Should -Be $false
+    }
+
     It 'Can evaluate "not" conditions' {
         $PresetJson = @{}
         $NotCondition = @'
