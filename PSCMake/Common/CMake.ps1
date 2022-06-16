@@ -51,6 +51,16 @@ function FindCMakeRoot {
     $script:CMakeRoot
 }
 
+$script:CMakePresetsPath = $null
+
+<#
+ .Synopsis
+  Gets the path that the most recently loaded CMakePresets.json was loaded from.
+#>
+function GetCMakePresetsPath {
+    $script:CMakePresetsPath
+}
+
 <#
  .Synopsis
   Loads the CMakePresets.json into a PowerShell representation.
@@ -153,12 +163,12 @@ function ResolvePresets {
     )
     $PresetJson = $CMakePresetsJson.$PresetType | Where-Object { $_.name -eq $PresetName }
     if (-not $PresetJson) {
-        Write-Error "Unable to find $PresetType '$Preset' in $script:CMakePresetsPath"
+        Write-Error "Unable to find $PresetType '$Preset' in $(GetCMakePresetsPath)"
     }
 
     $ConfigurePresetJson = $CMakePresetsJson.configurePresets | Where-Object { $_.name -eq $PresetJson.configurePreset }
     if (-not $ConfigurePresetJson) {
-        Write-Error "Unable to find configure preset '$($PresetJson.configurePreset)' in $script:CMakePresetsPath"
+        Write-Error "Unable to find configure preset '$($PresetJson.configurePreset)' in $(GetCMakePresetsPath)"
     }
 
     $PresetJson, $ConfigurePresetJson
@@ -226,31 +236,47 @@ function EvaluateCondition {
             return
         }
         'inList' {
-            Write-Error "$_ is not yet implemented as a condition type."
-            return
+            $ExpandedString = MacroReplacement $ConditionJson.String $PresetJson
+            foreach ($String in $ConditionJson.list) {
+                if ($ExpandedString -eq (MacroReplacement $String $PresetJson)) {
+                    return $true
+                }
+            }
+            return $false
         }
         'notInList' {
-            Write-Error "$_ is not yet implemented as a condition type."
-            return
+            $ExpandedString = MacroReplacement $ConditionJson.String $PresetJson
+            foreach ($String in $ConditionJson.list) {
+                if ($ExpandedString -eq (MacroReplacement $String $PresetJson)) {
+                    return $false
+                }
+            }
+            return $true
         }
         'matches' {
-            Write-Error "$_ is not yet implemented as a condition type."
-            return
+            return (MacroReplacement $ConditionJson.string $PresetJson) -match $ConditionJson.matches
         }
         'notMatches' {
-            Write-Error "$_ is not yet implemented as a condition type."
-            return
+            return -not ((MacroReplacement $ConditionJson.string $PresetJson) -match $ConditionJson.matches)
         }
         'anyOf' {
-            Write-Error "$_ is not yet implemented as a condition type."
-            return
+            foreach ($NestedCondition in $ConditionJson.conditions) {
+                if (EvaluateCondition $NestedCondition $PresetJson) {
+                    return $true
+                }
+            }
+            return $false
         }
         'allOf' {
-            Write-Error "$_ is not yet implemented as a condition type."
-            return
+            foreach ($NestedCondition in $ConditionJson.conditions) {
+                if (-not (EvaluateCondition $NestedCondition $PresetJson)) {
+                    return $false
+                }
+            }
+            return $true
         }
         'not' {
-            return -not (EvaluateCondition $ConditionJson.condition PresetJson)
+            return -not (EvaluateCondition $ConditionJson.condition $PresetJson)
         }
     }
 }
@@ -296,15 +322,15 @@ function MacroReplacement {
         $Left
         switch -regex ($Match) {
             '\$\{sourceDir\}' {
-                Split-Path -Path $script:CMakePresetsPath
+                Split-Path -Path (GetCMakePresetsPath)
                 break
             }
             '\$\{sourceParentDir\}' {
-                Split-Path -Path (Split-Path -Path $script:CMakePresetsPath)
+                Split-Path -Path (Split-Path -Path (GetCMakePresetsPath))
                 break
             }
             '\$\{sourceDirName\}' {
-                Split-Path -Leaf -Path (Split-Path -Path $script:CMakePresetsPath)
+                Split-Path -Leaf -Path (Split-Path -Path (GetCMakePresetsPath))
                 break
             }
             '\$\{presetName\}' {
