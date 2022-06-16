@@ -250,7 +250,7 @@ function EvaluateCondition {
             return
         }
         'not' {
-            return -not (EvaluateCondition $ConditionJson.condition PresetJson)
+            return -not (EvaluateCondition $ConditionJson.condition $PresetJson)
         }
     }
 }
