@@ -240,8 +240,12 @@ function EvaluateCondition {
             return -not ((MacroReplacement $ConditionJson.string $PresetJson) -match $ConditionJson.matches)
         }
         'anyOf' {
-            Write-Error "$_ is not yet implemented as a condition type."
-            return
+            foreach ($NestedCondition in $ConditionJson.conditions) {
+                if (EvaluateCondition $NestedCondition $PresetJson) {
+                    return $true
+                }
+            }
+            return $false
         }
         'allOf' {
             foreach ($NestedCondition in $ConditionJson.conditions) {
