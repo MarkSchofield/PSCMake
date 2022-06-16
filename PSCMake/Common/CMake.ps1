@@ -226,8 +226,13 @@ function EvaluateCondition {
             return
         }
         'inList' {
-            Write-Error "$_ is not yet implemented as a condition type."
-            return
+            $ExpandedString = MacroReplacement $ConditionJson.String $PresetJson
+            foreach ($String in $ConditionJson.list) {
+                if ($ExpandedString -eq (MacroReplacement $String $PresetJson)) {
+                    return $true
+                }
+            }
+            return $false
         }
         'notInList' {
             Write-Error "$_ is not yet implemented as a condition type."

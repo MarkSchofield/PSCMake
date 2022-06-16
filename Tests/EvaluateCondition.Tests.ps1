@@ -56,6 +56,39 @@ Describe 'EvaluateCondition' {
         EvaluateCondition $NonMatchingCondition $PresetJson | Should -Be $false
     }
 
+    It 'Can evaluate "inList" conditions' {
+        $PresetJson = @{}
+        $Condition = @'
+        {
+            "type": "inList",
+            "string": "${hostSystemName}",
+            "list": [ "Linux", "Windows" ]
+        }
+'@ | ConvertFrom-Json
+
+        EvaluateCondition $Condition $PresetJson | Should -Be $true
+
+        $Condition = @'
+        {
+            "type": "inList",
+            "string": "${hostSystemName}",
+            "list": [ "Chunky", "Bacon" ]
+        }
+'@ | ConvertFrom-Json
+
+        EvaluateCondition $Condition $PresetJson | Should -Be $false
+
+        $Condition = @'
+        {
+            "type": "inList",
+            "string": "${hostSystemName}",
+            "list": [ "${hostSystemName}" ]
+        }
+'@ | ConvertFrom-Json
+
+        EvaluateCondition $Condition $PresetJson | Should -Be $true
+    }
+
     It 'Can evaluate "matches" conditions' {
         $MatchingCondition = @'
         {
