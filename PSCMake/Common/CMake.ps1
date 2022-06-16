@@ -234,12 +234,10 @@ function EvaluateCondition {
             return
         }
         'matches' {
-            Write-Error "$_ is not yet implemented as a condition type."
-            return
+            return (MacroReplacement $ConditionJson.string $PresetJson) -match $ConditionJson.matches
         }
         'notMatches' {
-            Write-Error "$_ is not yet implemented as a condition type."
-            return
+            return -not ((MacroReplacement $ConditionJson.string $PresetJson) -match $ConditionJson.matches)
         }
         'anyOf' {
             Write-Error "$_ is not yet implemented as a condition type."
