@@ -50,14 +50,11 @@ PrereleaseMetadata  = $PrereleaseMetadata
 
 Update-ModuleManifest -Path (Join-Path -Path $PSScriptRoot -ChildPath '../PSCMake/PSCMake.psd1') -ModuleVersion $BaseVersion -Prerelease $PrereleaseMetadata
 
-$PSRepositoryName = Split-Path -Leaf $RepositoryRoot
+$SourceModulePath = Resolve-Path "$RepositoryRoot/PSCMake"
+
 $PSRepositoryPath = Join-Path -Path $RepositoryRoot -ChildPath '__packages'
+$PSRepositoryModulePath = Join-Path -Path $PSRepositoryPath -ChildPath "PSCMake"
 
-$Null = Unregister-PSRepository -Name $PSRepositoryName -ErrorAction SilentlyContinue
 $Null = New-Item -Path $PSRepositoryPath -ItemType Directory -Force
-$Null = Remove-Item -Path "$PSRepositoryPath/PSCMake.$BaseVersion$PrereleaseMetadata.nupkg" -Force -ErrorAction SilentlyContinue
-$Null = Register-PSRepository -Name $PSRepositoryName -SourceLocation $PSRepositoryPath -PublishLocation $PSRepositoryPath
-
-$ModulePath = Resolve-Path "$RepositoryRoot/PSCMake"
-
-Publish-Module -Repository $PSRepositoryName -Path $ModulePath -Force
+$Null = Remove-Item -Path $PSRepositoryModulePath -Force -Recurse -ErrorAction SilentlyContinue
+$Null = Copy-Item -Path $SourceModulePath -Destination $PSRepositoryModulePath -Recurse -Force
