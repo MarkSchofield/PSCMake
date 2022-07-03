@@ -10,6 +10,8 @@ CMake file API, the module is able to offer tab-completion when specifying targe
 
 [![build status](https://github.com/MarkSchofield/PSCMake/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/MarkSchofield/PSCMake/actions/workflows/ci.yaml?query=branch%3Amain)
 
+[![codecov](https://codecov.io/gh/MarkSchofield/PSCMake/branch/develop/graph/badge.svg?token=DS41WQROME)](https://codecov.io/gh/MarkSchofield/PSCMake)
+
 ## Installation
 
 To install the module, use PowerShell's `Import-Module` CmdLet:

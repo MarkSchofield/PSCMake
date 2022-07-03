@@ -142,7 +142,7 @@ function Configure-CMakeBuild {
     $PresetNames = GetConfigurePresetNames $CMakePresetsJson
     if (-not $Presets) {
         $Presets = $PresetNames | Select-Object -First 1
-        Write-Output "No preset specified, defaulting to: $Presets"
+        Write-Information "No preset specified, defaulting to: $Presets"
     }
 
     $CMake = GetCMake
@@ -230,7 +230,7 @@ function Build-CMakeBuild {
             Write-Error "No Presets values specified, and one could not be inferred."
         }
         $Presets = $PresetNames | Select-Object -First 1
-        Write-Output "No preset specified, defaulting to: $Presets"
+        Write-Information "No preset specified, defaulting to: $Presets"
     }
 
     $CMake = GetCMake
@@ -288,7 +288,7 @@ function Write-CMakeBuild {
             Write-Error "No Preset values specified, and one could not be inferred."
         }
         $Preset = $PresetNames | Select-Object -First 1
-        Write-Output "No preset specified, defaulting to: $Preset"
+        Write-Information "No preset specified, defaulting to: $Preset"
     }
 
     $BuildPreset, $ConfigurePreset = ResolvePresets $CMakePresetsJson 'buildPresets' $Preset

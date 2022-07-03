@@ -2,17 +2,23 @@ name: PSCMake CI
 on:
   push:
     branches:
+      - develop
+      - feature/*
       - main
+      - release/*
+      - support/*
     paths-ignore:
       - '.vscode/**'
       - 'README.md'
   workflow_dispatch:
 jobs:
-  run-pester-tests:
+  build:
     runs-on: windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
       - name: Invoke-Pester
         shell: pwsh
         run: |
@@ -24,6 +30,41 @@ jobs:
             }
             CodeCoverage = @{
               Enabled = $true
+              OutputFormat = 'JaCoCo'
+              OutputPath = '${{ env.GITHUB_WORKSPACE }}/Pester-Coverage.xml'
             }
           }
           Invoke-Pester -Configuration $Configuration
+      - uses: codecov/codecov-action@v2
+        with:
+          files: '${{ env.GITHUB_WORKSPACE }}/Pester-Coverage.xml'
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: true
+          verbose: true
+      - name: Build
+        shell: pwsh
+        run: |
+          & .\Build\Publish.ps1 -Verbose
+      - name: Upload __packages
+        uses: actions/upload-artifact@v2
+        with:
+          name: __packages
+          path: __packages
+  release:
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: PowerShellGallery
+    steps:
+      - name: Download __packages
+        id: download
+        uses: actions/download-artifact@v3
+        with:
+          name: __packages
+          path: __packages
+      - name: Publish to PowerShellGallery
+        shell: pwsh
+        run: |
+          $ModulePath = Join-Path -Path '${{steps.download.outputs.download-path}}' -ChildPath 'PSCMake'
+          Publish-Module -Path $ModulePath -NuGetApiKey '${{ secrets.PSCMAKEPUBLISH }}' -Repository PSGallery
