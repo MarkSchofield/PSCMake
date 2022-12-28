@@ -148,7 +148,7 @@ function Configure-CMakeBuild {
     $CMake = GetCMake
     Using-Location $CMakeRoot {
         foreach ($Preset in $Presets) {
-            Write-Output "Preset: $Preset"
+            Write-Output "Preset         : $Presets"
 
             $ConfigurePreset = $CMakePresetsJson.configurePresets | Where-Object { $_.name -eq $Preset }
             if (-not $ConfigurePreset) {
@@ -230,9 +230,14 @@ function Build-CMakeBuild {
             Write-Error "No Presets values specified, and one could not be inferred."
         }
         $Presets = $PresetNames | Select-Object -First 1
-        Write-Information "No preset specified, defaulting to: $Presets"
     }
 
+    # If;
+    #   * no targets were specified, and
+    #   * the current location is different from the cmake root
+    # Then we're a scoped build!
+    $ScopedBuild = (-not $Targets) -and ($CMakeRoot -ne ((Get-Location).Path))
+    $ScopeLocation = (Get-Location).Path
     $CMake = GetCMake
     Using-Location $CMakeRoot {
         foreach ($Preset in $Presets) {
@@ -246,6 +251,27 @@ function Build-CMakeBuild {
             if ((-not (Test-Path -Path $CMakeCacheFile -PathType Leaf)) -or
                 $Configure) {
                 Configure-CMakeBuild -Presets $ConfigurePreset.name
+            } else {
+                Write-Output "Preset         : $Presets"
+            }
+
+            if ($ScopedBuild) {
+                $CodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
+                $CodeModelConfiguration = $CodeModel.configurations |
+                    Where-Object { $_.name -eq 'Release' }
+                $TargetTuples = $CodeModelConfiguration.targets |
+                    ForEach-Object {
+                        [pscustomobject]@{
+                            Name=$_.name
+                            Folder=$CodeModelConfiguration.directories[$_.directoryIndex].build
+                        }
+                    } |
+                    Where-Object { $_.Folder -ne '.' } |
+                    Where-Object { (Join-Path -Path $CMakeRoot -ChildPath $_.Folder).StartsWith($ScopeLocation) }
+                if ($TargetTuples) {
+                    $Targets = $TargetTuples.Name
+                    Write-Output "Scoped Targets : $Targets"
+                }
             }
 
             $CMakeArguments = @(
@@ -259,6 +285,8 @@ function Build-CMakeBuild {
             Write-Verbose "CMake Arguments: $CMakeArguments"
 
             foreach ($Configuration in $Configurations) {
+                Write-Output "Configuration  : $Configuration"
+
                 $StartTime = [datetime]::Now
                 & $CMake @CMakeArguments (($Configuration)?('--config', $Configuration):$null)
                 if ($Report) {
@@ -277,8 +305,8 @@ function Write-CMakeBuild {
         [Parameter(Position = 1)]
         [string] $Configuration,
 
-        [ValidateSet('dot')]
-        [string] $As
+        [ValidateSet('dot','dgml')]
+        [string] $As = 'dot'
     )
     $CMakePresetsJson = GetCMakePresets
     $PresetNames = GetBuildPresetNames $CMakePresetsJson
@@ -300,7 +328,11 @@ function Write-CMakeBuild {
         $Configuration = 'Debug'
     }
 
-    WriteDot $Configuration $CodeModel $CodeModelDirectory
+    if ($As -eq 'dot') {
+        WriteDot $Configuration $CodeModel $CodeModelDirectory
+    } elseif ($As -eq 'dgml') {
+        WriteDgml $Configuration $CodeModel $CodeModelDirectory
+    }
 }
 
 Register-ArgumentCompleter -CommandName Build-CMakeBuild -ParameterName Presets -ScriptBlock $function:BuildPresetsCompleter

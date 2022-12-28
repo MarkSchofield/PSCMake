@@ -115,12 +115,12 @@ function Report-NinjaBuild {
 
 function Download-Ninja {
     param(
-        [string] $OutputPath
+        [string] $OutputPath,
+        $NinjaVersion = '1.11.1',
+        $NinjaArchiveSha256Hash = '524B344A1A9A55005EAF868D991E090AB8CE07FA109F1820D40E74642E289ABC'
     )
-    $NinjaVersion = '1.10.2'
     $NinjaArchiveUrl = "https://github.com/ninja-build/ninja/releases/download/v$NinjaVersion/ninja-win.zip"
     $NinjaArchivePath = Join-Path -Path $OutputPath -ChildPath 'ninja-win.zip'
-    $NinjaArchiveSha256Hash = 'BBDE850D247D2737C5764C927D1071CBB1F1957DCABDA4A130FA8547C12C695F'
     $NinjaExecutablePath = Join-Path -Path $OutputPath -ChildPath 'ninja.exe'
 
     if (-not (IsUpToDate $NinjaExecutablePath $NinjaArchivePath)) {

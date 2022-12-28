@@ -429,3 +429,57 @@ function WriteDot {
     }
     "}"
 }
+
+function WriteDgml {
+    param (
+        $Configuration,
+        $CodeModel,
+        $CodeModelDirectory
+    )
+    $Targets = @{}
+    '<?xml version="1.0" encoding="utf-8"?>'
+    '<DirectedGraph>'
+        '<Nodes>'
+            ($CodeModel.configurations | Where-Object { $_.name -eq $Configuration }).targets |
+                ForEach-Object {
+                    '<Node'
+                        "  Id=`"$($_.id)`""
+                        "  Label=`"$($_.name)`""
+                        '/>'
+
+                    $TargetJson = Get-Content (Join-Path -Path $CodeModelDirectory -ChildPath $_.jsonFile) |
+                        ConvertFrom-Json
+
+                    Get-MemberValue -InputObject $TargetJson -Name artifacts -Or @() |
+                        ForEach-Object {
+                            '<Node'
+                                "  Id=`"$($_.path)`""
+                                '/>'
+                        }
+
+                    $Targets[$_.id] = $TargetJson
+                }
+        '</Nodes>'
+        '<Links>'
+            $Targets.GetEnumerator() |
+                ForEach-Object {
+                    $Source = $_.Name
+                    Get-MemberValue -InputObject $_.Value -Name dependencies -Or @() |
+                        ForEach-Object {
+                        '<Link'
+                            "  Source=`"$Source`""
+                            "  Target=`"$($_.id)`""
+                            '/>'
+                    }
+
+                    Get-MemberValue -InputObject $_.Value -Name artifacts -Or @() |
+                        ForEach-Object {
+                        '<Link'
+                            "  Source=`"$Source`""
+                            "  Target=`"$($_.path)`""
+                            '/>'
+                    }
+                }
+        '</Links>'
+    '</DirectedGraph>'
+}
