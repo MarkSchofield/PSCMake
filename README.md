@@ -29,7 +29,7 @@ The module provides the following commands:
 
 1. `Configure-CMakeBuild` - To run CMake configuration for a given preset
 2. `Build-CMakeBuild` - To run a CMake build.
-3. `Write-CMakeBuild` - To output the CMake build as a DOT graph.
+3. `Write-CMakeBuild` - To output the CMake build as a DOT or DGML graph.
 
 Running `Build-CMakeBuild` by itself would run the first `buildConfiguration`. Run either command with `-?` to get more
 details.

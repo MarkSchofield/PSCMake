@@ -305,8 +305,8 @@ function Write-CMakeBuild {
         [Parameter(Position = 1)]
         [string] $Configuration,
 
-        [ValidateSet('dot')]
-        [string] $As
+        [ValidateSet('dot','dgml')]
+        [string] $As = 'dot'
     )
     $CMakePresetsJson = GetCMakePresets
     $PresetNames = GetBuildPresetNames $CMakePresetsJson
@@ -328,7 +328,11 @@ function Write-CMakeBuild {
         $Configuration = 'Debug'
     }
 
-    WriteDot $Configuration $CodeModel $CodeModelDirectory
+    if ($As -eq 'dot') {
+        WriteDot $Configuration $CodeModel $CodeModelDirectory
+    } elseif ($As -eq 'dgml') {
+        WriteDgml $Configuration $CodeModel $CodeModelDirectory
+    }
 }
 
 Register-ArgumentCompleter -CommandName Build-CMakeBuild -ParameterName Presets -ScriptBlock $function:BuildPresetsCompleter
