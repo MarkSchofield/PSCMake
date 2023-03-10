@@ -127,6 +127,9 @@ function ConfigurePresetsCompleter {
  .Parameter Presets
   The configure preset names to use.
 
+.Parameter Fresh
+  A switch specifying whether a 'fresh' configuration is performed - removing any existing cache.
+
  .Example
    # Configure the 'windows-x64' and 'windows-x86' CMake builds.
    Configure-CMakeBuild -Presets windows-x64,windows-x86
@@ -135,7 +138,10 @@ function Configure-CMakeBuild {
     [CmdletBinding()]
     param(
         [Parameter()]
-        [string[]] $Presets
+        [string[]] $Presets,
+
+        [Parameter()]
+        [switch] $Fresh
     )
     $CMakeRoot = FindCMakeRoot
     $CMakePresetsJson = GetCMakePresets
@@ -160,6 +166,9 @@ function Configure-CMakeBuild {
 
             $CMakeArguments = @(
                 '--preset', $Preset
+                if ($Fresh) {
+                    '--fresh'
+                }
                 if ($VerbosePreference) {
                     '--log-level=VERBOSE'
                 }
@@ -192,6 +201,9 @@ function Configure-CMakeBuild {
  .Parameter Report
    [Exploration] A switch specifying whether a report should be written of the command times of the build. Ninja builds only.
 
+ .Parameter Fresh
+   A switch specifying whether a 'fresh' configuration should be performed before the build is run.
+
  .Example
    # Build the 'windows-x64' and 'windows-x86' CMake builds.
    Build-CMakeBuild -Presets windows-x64,windows-x86
@@ -219,7 +231,10 @@ function Build-CMakeBuild {
         [switch] $Configure,
 
         [Parameter()]
-        [switch] $Report
+        [switch] $Report,
+
+        [Parameter()]
+        [switch] $Fresh
     )
     $CMakeRoot = FindCMakeRoot
     $CMakePresetsJson = GetCMakePresets
@@ -249,8 +264,9 @@ function Build-CMakeBuild {
             #  1) "$BinaryDirectory/CMakeCache.txt" doesn't exist
             #  2) '-configure' was specified
             if ((-not (Test-Path -Path $CMakeCacheFile -PathType Leaf)) -or
-                $Configure) {
-                Configure-CMakeBuild -Presets $ConfigurePreset.name
+                $Configure -or
+                $Fresh) {
+                Configure-CMakeBuild -Presets $ConfigurePreset.name -Fresh:$Fresh
             } else {
                 Write-Output "Preset         : $Presets"
             }
