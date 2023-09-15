@@ -353,11 +353,10 @@ function MacroReplacement {
                 '$'
                 break
             }
-            '\$env\{\}' {
-                Write-Error "$_ is not yet implemented as a macro replacement."
-                break
+            '\$env\{([^\}]*)\}' {
+                [System.Environment]::GetEnvironmentVariable($Matches[1])
             }
-            '\$penv\{\}' {
+            '\$penv\{([^\}]*)\}' {
                 Write-Error "$_ is not yet implemented as a macro replacement."
                 break
             }
