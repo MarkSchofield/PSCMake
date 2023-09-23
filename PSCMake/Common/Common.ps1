@@ -107,3 +107,13 @@ function GetPathOfFileAbove([string]$Location, [string]$File) {
         }
     }
 }
+
+<#
+ .Synopsis
+  Converts named items on a Pipeline into a hash table.
+#>
+filter ToHashTable {
+    begin { $Result = @{} }
+    process { $Result[$_.Name] = $_.Value }
+    end { $Result }
+}
