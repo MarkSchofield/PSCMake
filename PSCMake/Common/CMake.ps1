@@ -398,16 +398,54 @@ function Get-CMakeBuildCodeModelDirectory {
     Join-Path -Path $BinaryDirectory -ChildPath '.cmake/api/v1/reply'
 }
 
+<#
+ .Synopsis
+  Gets PowerShell representation of the CodeModel JSON for the given binary directory.
+
+ .Outputs
+  The PowerShell representation of the CodeModel JSON for the given binary directory, or `$null` if it can't be found.
+#>
 function Get-CMakeBuildCodeModel {
     param(
         [string] $BinaryDirectory
     )
-    Get-ChildItem -Path (Get-CMakeBuildCodeModelDirectory $BinaryDirectory) -File -Filter 'codemodel-v2-*' |
+    Get-ChildItem -Path (Get-CMakeBuildCodeModelDirectory $BinaryDirectory) -File -Filter 'codemodel-v2-*' -ErrorAction SilentlyContinue |
         Select-Object -First 1 |
         Get-Content |
         ConvertFrom-Json
 }
 
+<#
+ .Synopsis
+  Gets the target with the given name, for the given configuration from the specified code model.
+
+ .Outputs
+  The PowerShell representation of the target from the CodeModel JSON.
+#>
+function GetNamedTarget {
+    param(
+        $CodeModel,
+        $Configuration,
+        $Name
+    )
+    $CodeModelConfiguration = if ($Configuration) {
+        $CodeModel.configurations | Where-Object { $_.name -eq $Configuration }
+    } else {
+        $CodeModel.configurations[0]
+    }
+    $CodeModelConfiguration.targets |
+        Where-Object {
+            $_.name -eq $Name
+        }
+}
+
+<#
+ .Synopsis
+  Gets all targets within the given folder scope, for the given configuration from the specified code model.
+
+ .Outputs
+  The PowerShell representation of the target(s) from the CodeModel JSON.
+#>
 function GetScopedTargets {
     param(
         $CodeModel,
