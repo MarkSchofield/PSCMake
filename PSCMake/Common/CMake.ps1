@@ -28,6 +28,8 @@ $ErrorActionPreference = 'Stop'
 
 . $PSScriptRoot/Common.ps1
 
+$PEnv = Get-ChildItem env: | ToHashTable
+
 $PreviousLocation = $null
 $CMakeCandidates = @(
     (Get-Command 'cmake' -ErrorAction SilentlyContinue)
@@ -357,8 +359,7 @@ function MacroReplacement {
                 [System.Environment]::GetEnvironmentVariable($Matches[1])
             }
             '\$penv\{([^\}]*)\}' {
-                Write-Error "$_ is not yet implemented as a macro replacement."
-                break
+                $PEnv[$Matches[1]]
             }
             '\$vendor\{\w+\}' {
                 Get-MemberValue (GetMacroConstants) $_ -Or $_
