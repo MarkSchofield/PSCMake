@@ -50,4 +50,53 @@ digraph CodeModel {
                 Should -Be $ExpectedDgml.OuterXml
         }
     }
+
+    It 'Writes the build as DGML' {
+        Using-Location "$PSScriptRoot/ReferenceBuild" {
+            $ExpectedDGMLFile = @'
+<?xml version="1.0" encoding="utf-8"?>
+<DirectedGraph xmlns="http://schemas.microsoft.com/vs/2009/dgml">
+<Nodes>
+<Node
+    Id="A_Library::@6890427a1f51a3e7e1df"
+    Label="A_Library"
+/>
+<Node
+    Id="Debug/A_Library.lib"
+/>
+<Node
+    Id="B_Library::@6890427a1f51a3e7e1df"
+    Label="B_Library"
+/>
+<Node
+    Id="Debug/B_Library.lib"
+/>
+<Node
+    Id="C_Library::@6890427a1f51a3e7e1df"
+    Label="C_Library"
+/>
+<Node
+    Id="Debug/C_Library.lib"
+/>
+</Nodes>
+<Links>
+<Link
+    Source="C_Library::@6890427a1f51a3e7e1df"
+    Target="Debug/C_Library.lib"
+/>
+<Link
+    Source="A_Library::@6890427a1f51a3e7e1df"
+    Target="Debug/A_Library.lib"
+/>
+<Link
+    Source="B_Library::@6890427a1f51a3e7e1df"
+    Target="Debug/B_Library.lib"
+/>
+</Links>
+</DirectedGraph>
+'@
+            ((Write-CMakeBuild -As DGML) -join '') |
+              Should -Be ($ExpectedDGMLFile -replace '\r\n','')
+        }
+    }
 }
