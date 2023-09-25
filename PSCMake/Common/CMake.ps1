@@ -438,7 +438,7 @@ function WriteDgml {
     )
     $Targets = @{}
     '<?xml version="1.0" encoding="utf-8"?>'
-    '<DirectedGraph>'
+    '<DirectedGraph xmlns="http://schemas.microsoft.com/vs/2009/dgml">'
         '<Nodes>'
             ($CodeModel.configurations | Where-Object { $_.name -eq $Configuration }).targets |
                 ForEach-Object {
