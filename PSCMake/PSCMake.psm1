@@ -287,37 +287,30 @@ function Build-CMakeBuild {
                 ConfigureCMake $CMake $CMakePresetsJson $ConfigurePreset -Fresh:$Fresh
             }
 
-            if ($ScopedBuild) {
-                $CodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
-                $CodeModelConfiguration = $CodeModel.configurations |
-                    Where-Object { $_.name -eq 'Release' }
-                $TargetTuples = $CodeModelConfiguration.targets |
-                    ForEach-Object {
-                        [pscustomobject]@{
-                            Name=$_.name
-                            Folder=$CodeModelConfiguration.directories[$_.directoryIndex].build
-                        }
-                    } |
-                    Where-Object { $_.Folder -ne '.' } |
-                    Where-Object { (Join-Path -Path $CMakeRoot -ChildPath $_.Folder).StartsWith($ScopeLocation) }
-                if ($TargetTuples) {
-                    $Targets = $TargetTuples.Name
-                    Write-Output "Scoped Targets : $Targets"
-                }
-            }
-
-            $CMakeArguments = @(
-                '--build'
-                '--preset', $Preset
-                if ($Targets) {
-                    '--target', $Targets
-                }
-            )
-
-            Write-Verbose "CMake Arguments: $CMakeArguments"
+            $CodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
 
             foreach ($Configuration in $Configurations) {
                 Write-Output "Configuration  : $Configuration"
+
+                if ($ScopedBuild) {
+                    $TargetTuples = GetScopedTargets $CodeModel $Configuration $ScopeLocation
+                    $Targets = if ($TargetTuples) {
+                        $TargetTuples.name
+                    } else {
+                        @()
+                    }
+                    Write-Output "Scoped Targets : $Targets"
+                }
+
+                $CMakeArguments = @(
+                    '--build'
+                    '--preset', $Preset
+                    if ($Targets) {
+                        '--target', $Targets
+                    }
+                )
+
+                Write-Verbose "CMake Arguments: $CMakeArguments"
 
                 $StartTime = [datetime]::Now
                 & $CMake @CMakeArguments (($Configuration)?('--config', $Configuration):$null)
@@ -337,7 +330,7 @@ function Write-CMakeBuild {
         [Parameter(Position = 1)]
         [string] $Configuration,
 
-        [ValidateSet('dot','dgml')]
+        [ValidateSet('dot', 'dgml')]
         [string] $As = 'dot'
     )
     $CMakePresetsJson = GetCMakePresets

@@ -408,6 +408,29 @@ function Get-CMakeBuildCodeModel {
         ConvertFrom-Json
 }
 
+function GetScopedTargets {
+    param(
+        $CodeModel,
+        $Configuration,
+        $ScopeLocation
+    )
+    $CodeModelConfiguration = if ($Configuration) {
+        $CodeModel.configurations | Where-Object { $_.name -eq $Configuration }
+    } else {
+        $CodeModel.configurations[0]
+    }
+    $CodeModelConfiguration.targets |
+        Where-Object {
+            $Folder = $CodeModelConfiguration.directories[$_.directoryIndex].build
+            $Folder = if ($Folder -eq '.') {
+                $CMakeRoot
+            } else {
+                Join-Path -Path $CMakeRoot -ChildPath $Folder
+            }
+            $Folder.StartsWith($ScopeLocation)
+        }
+}
+
 function WriteDot {
     param (
         $Configuration,
