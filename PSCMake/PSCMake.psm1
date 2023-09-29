@@ -360,9 +360,132 @@ function Write-CMakeBuild {
     }
 }
 
+<#
+ .Synopsis
+ Runs the output of a CMake build.
+
+ .Description
+ `Invoke-CMakeOutput` runs the output of a CMake build. A {preset,configuration,target} can be specified, and `Invoke-CMakeOutput`
+ will build the target, use the CMake code-model to discover the path to the generated executable and run it, passing any
+ extra parameter specified. If `Invoke-CMakeOutput` is run from a folder that only contains a single executable target,
+ then that target will be built and run.
+
+ .Parameter Preset
+ The CMake preset to use. If none is specified, then the first valid preset from CMakePresets.json is used.
+
+ .Parameter Configuration
+ The CMake configuration to use. If none is specified, then the first valid configuration is used.
+
+ .Parameter Target
+ The CMake target that produces an executable to run.
+
+ .Parameter SkipBuild
+ If specified, the build will be skipped, otherwise a build will be run before invoking the output.
+
+ .Parameter Arguments
+ All other parameters will be passed to the discovered executable.
+
+#>
+function Invoke-CMakeOutput {
+    [CmdletBinding(PositionalBinding=$false)]
+    param(
+        [Parameter()]
+        [string] $Preset,
+
+        [Parameter()]
+        [string] $Configuration,
+
+        [Parameter()]
+        [string] $Target,
+
+        [Parameter()]
+        [switch] $SkipBuild,
+
+        [Parameter(ValueFromRemainingArguments)]
+        [string[]] $Arguments
+    )
+    $CMakePresetsJson = GetCMakePresets
+    $PresetNames = GetBuildPresetNames $CMakePresetsJson
+
+    if (-not $Preset) {
+        if (-not $PresetNames) {
+            Write-Error "No Presets values specified, and one could not be inferred."
+        }
+        $Preset = $PresetNames | Select-Object -First 1
+    }
+
+    $BuildPreset, $ConfigurePreset = ResolvePresets $CMakePresetsJson 'buildPresets' $Preset
+    $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
+
+    # Find the 'code model' for the preset. If no code model is found, configure the build and try again.
+    #
+    $CodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
+    if (-not $CodeModel) {
+        Configure-CMakeBuild -Presets $Preset
+        $CodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
+    }
+
+    # Find the 'code model' target JSON. If a target was specified, use that, otherwise find targets within the current
+    # scope.
+    #
+    $TargetTuplesCodeModel = if ($Target) {
+        GetNamedTarget $CodeModel $Configuration $Target
+    } else {
+        $ScopeLocation = (Get-Location).Path
+        GetScopedTargets $CodeModel $Configuration $ScopeLocation
+    }
+
+    # For the 'code model' JSON that was found, load the full 'target' JSON to be able to find 'EXECUTABLE' targets.
+    #
+    $TargetTuples = $TargetTuplesCodeModel |
+        ForEach-Object {
+            Join-Path -Path (Get-CMakeBuildCodeModelDirectory $BinaryDirectory) -ChildPath $_.jsonFile |
+                Get-Item |
+                Get-Content |
+                ConvertFrom-Json
+        }
+    $ExecutableTargetTuples = $TargetTuples |
+        Where-Object {
+            $_.type -eq 'EXECUTABLE'
+        }
+    $Count = ($ExecutableTargetTuples | Measure-Object).Count
+    if ($Count -eq 0) {
+        Write-Error "No executable target in scope."
+    }
+
+    if ($Count -ne 1) {
+        Write-Error "Multiple executable scoped targets match. Specify a target explicitly: $($ExecutableTargetTuples.name)"
+    }
+
+    # Having resolved presets/configuration/target, there is enough information to build or run. If we weren't told to
+    # skip the build, then build.
+    #
+    if (-not $SkipBuild) {
+        Write-Output "Build: $($ExecutableTargetTuples.name)"
+        Write-Output '----'
+        Build-CMakeBuild -Presets $Preset -Configurations $Configuration -Targets $ExecutableTargetTuples.name
+    }
+
+    # Build the fully qualified path to the output of the target an invoke it with the specified arguments.
+    #
+    $TargetNamePath = $ExecutableTargetTuples.nameOnDisk
+    $TargetRelativePath = ($ExecutableTargetTuples.artifacts | Where-Object { $_.path.endsWith($TargetNamePath) }).path
+    $TargetPath = Join-Path -Path $CodeModel.paths.build -ChildPath $TargetRelativePath
+
+    Write-Output "Running: $TargetPath $Arguments"
+    Write-Output '----'
+    & $TargetPath @Arguments
+}
+
+Register-ArgumentCompleter -CommandName Invoke-CMakeOutput -ParameterName Preset -ScriptBlock $function:BuildPresetsCompleter
+Register-ArgumentCompleter -CommandName Invoke-CMakeOutput -ParameterName Configuration -ScriptBlock $function:BuildConfigurationsCompleter
+Register-ArgumentCompleter -CommandName Invoke-CMakeOutput -ParameterName Target -ScriptBlock $function:BuildTargetsCompleter
+
 Register-ArgumentCompleter -CommandName Build-CMakeBuild -ParameterName Presets -ScriptBlock $function:BuildPresetsCompleter
 Register-ArgumentCompleter -CommandName Build-CMakeBuild -ParameterName Configurations -ScriptBlock $function:BuildConfigurationsCompleter
 Register-ArgumentCompleter -CommandName Build-CMakeBuild -ParameterName Targets -ScriptBlock $function:BuildTargetsCompleter
+
 Register-ArgumentCompleter -CommandName Configure-CMakeBuild -ParameterName Presets -ScriptBlock $function:ConfigurePresetsCompleter
+
 Register-ArgumentCompleter -CommandName Write-CMakeBuild -ParameterName Preset -ScriptBlock $function:BuildPresetsCompleter
 Register-ArgumentCompleter -CommandName Write-CMakeBuild -ParameterName Configuration -ScriptBlock $function:BuildConfigurationsCompleter
