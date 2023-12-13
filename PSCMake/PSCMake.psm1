@@ -310,10 +310,12 @@ function Build-CMakeBuild {
                 $CMakeArguments = @(
                     '--build'
                     '--preset', $Preset
-                    if ($Targets) {
-                        '--target', $Targets
-                    }
                 )
+
+                if ($Targets) {
+                    $CMakeArguments += '--target'
+                    $CMakeArguments += $Targets
+                }
 
                 Write-Verbose "CMake Arguments: $CMakeArguments"
 
