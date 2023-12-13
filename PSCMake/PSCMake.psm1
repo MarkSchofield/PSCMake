@@ -145,6 +145,9 @@ function ConfigureCMake {
     Write-Verbose "CMake Arguments: $CMakeArguments"
 
     & $CMake @CMakeArguments
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Configuration failed. Command line: '$($CMake.Source)' $($CMakeArguments -join ' ')"
+    }
 }
 
 <#
