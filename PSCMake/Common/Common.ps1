@@ -80,7 +80,7 @@ function IsUpToDate($Target) {
 function Using-Location($Location, $Scriptlet) {
     Push-Location -Path $Location
     try {
-        & $Scriptlet
+        Invoke-Command $Scriptlet
     } finally {
         Pop-Location
     }
