@@ -28,6 +28,8 @@ $ErrorActionPreference = 'Stop'
 
 . $PSScriptRoot/Common.ps1
 
+$PEnv = Get-ChildItem env: | ToHashTable
+
 $PreviousLocation = $null
 $CMakeCandidates = @(
     (Get-Command 'cmake' -ErrorAction SilentlyContinue)
@@ -353,13 +355,11 @@ function MacroReplacement {
                 '$'
                 break
             }
-            '\$env\{\}' {
-                Write-Error "$_ is not yet implemented as a macro replacement."
-                break
+            '\$env\{([^\}]*)\}' {
+                [System.Environment]::GetEnvironmentVariable($Matches[1])
             }
-            '\$penv\{\}' {
-                Write-Error "$_ is not yet implemented as a macro replacement."
-                break
+            '\$penv\{([^\}]*)\}' {
+                $PEnv[$Matches[1]]
             }
             '\$vendor\{\w+\}' {
                 Get-MemberValue (GetMacroConstants) $_ -Or $_
@@ -398,14 +398,75 @@ function Get-CMakeBuildCodeModelDirectory {
     Join-Path -Path $BinaryDirectory -ChildPath '.cmake/api/v1/reply'
 }
 
+<#
+ .Synopsis
+  Gets PowerShell representation of the CodeModel JSON for the given binary directory.
+
+ .Outputs
+  The PowerShell representation of the CodeModel JSON for the given binary directory, or `$null` if it can't be found.
+#>
 function Get-CMakeBuildCodeModel {
     param(
         [string] $BinaryDirectory
     )
-    Get-ChildItem -Path (Get-CMakeBuildCodeModelDirectory $BinaryDirectory) -File -Filter 'codemodel-v2-*' |
+    Get-ChildItem -Path (Get-CMakeBuildCodeModelDirectory $BinaryDirectory) -File -Filter 'codemodel-v2-*' -ErrorAction SilentlyContinue |
         Select-Object -First 1 |
         Get-Content |
         ConvertFrom-Json
+}
+
+<#
+ .Synopsis
+  Gets the target with the given name, for the given configuration from the specified code model.
+
+ .Outputs
+  The PowerShell representation of the target from the CodeModel JSON.
+#>
+function GetNamedTarget {
+    param(
+        $CodeModel,
+        $Configuration,
+        $Name
+    )
+    $CodeModelConfiguration = if ($Configuration) {
+        $CodeModel.configurations | Where-Object { $_.name -eq $Configuration }
+    } else {
+        $CodeModel.configurations[0]
+    }
+    $CodeModelConfiguration.targets |
+        Where-Object {
+            $_.name -eq $Name
+        }
+}
+
+<#
+ .Synopsis
+  Gets all targets within the given folder scope, for the given configuration from the specified code model.
+
+ .Outputs
+  The PowerShell representation of the target(s) from the CodeModel JSON.
+#>
+function GetScopedTargets {
+    param(
+        $CodeModel,
+        $Configuration,
+        $ScopeLocation
+    )
+    $CodeModelConfiguration = if ($Configuration) {
+        $CodeModel.configurations | Where-Object { $_.name -eq $Configuration }
+    } else {
+        $CodeModel.configurations[0]
+    }
+    $CodeModelConfiguration.targets |
+        Where-Object {
+            $Folder = $CodeModelConfiguration.directories[$_.directoryIndex].build
+            $Folder = if ($Folder -eq '.') {
+                $CMakeRoot
+            } else {
+                Join-Path -Path $CMakeRoot -ChildPath $Folder
+            }
+            $Folder.StartsWith($ScopeLocation)
+        }
 }
 
 function WriteDot {
@@ -438,7 +499,7 @@ function WriteDgml {
     )
     $Targets = @{}
     '<?xml version="1.0" encoding="utf-8"?>'
-    '<DirectedGraph>'
+    '<DirectedGraph xmlns="http://schemas.microsoft.com/vs/2009/dgml">'
         '<Nodes>'
             ($CodeModel.configurations | Where-Object { $_.name -eq $Configuration }).targets |
                 ForEach-Object {

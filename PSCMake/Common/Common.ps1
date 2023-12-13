@@ -80,7 +80,7 @@ function IsUpToDate($Target) {
 function Using-Location($Location, $Scriptlet) {
     Push-Location -Path $Location
     try {
-        & $Scriptlet
+        Invoke-Command $Scriptlet
     } finally {
         Pop-Location
     }
@@ -106,4 +106,14 @@ function GetPathOfFileAbove([string]$Location, [string]$File) {
             break
         }
     }
+}
+
+<#
+ .Synopsis
+  Converts named items on a Pipeline into a hash table.
+#>
+filter ToHashTable {
+    begin { $Result = @{} }
+    process { $Result[$_.Name] = $_.Value }
+    end { $Result }
 }

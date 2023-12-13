@@ -1,7 +1,9 @@
 #Requires -PSEdition Core
 
 BeforeAll {
+    $env:PSCMAKE_ENV_TEST = 42
     . $PSScriptRoot/../PSCMake/Common/CMake.ps1
+    $env:PSCMAKE_ENV_TEST = 43
 
     Mock GetMacroConstants { @{
         '${hostSystemName}'='Linux'
@@ -54,6 +56,16 @@ Describe 'MacroReplacement' {
     It 'Expands $vendor{PSCMake}' {
         MacroReplacement '$vendor{PSCMake}' $PresetJson |
             Should -Be 'true'
+    }
+
+    It 'Expands $env{PSCMAKE_ENV_TEST}' {
+        MacroReplacement '$env{PSCMAKE_ENV_TEST}' $PresetJson |
+            Should -Be 43
+    }
+
+    It 'Expands $penv{PSCMAKE_ENV_TEST}' {
+        MacroReplacement '$penv{PSCMAKE_ENV_TEST}' $PresetJson |
+            Should -Be 42
     }
 
     It 'Does not expand unknown vendor strings' {
