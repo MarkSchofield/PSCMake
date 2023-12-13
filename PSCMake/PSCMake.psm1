@@ -319,6 +319,10 @@ function Build-CMakeBuild {
 
                 $StartTime = [datetime]::Now
                 & $CMake @CMakeArguments (($Configuration)?('--config', $Configuration):$null)
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Error "Build failed. Command line: '$($CMake.Source)' $($CMakeArguments -join ' ')"
+                }
+
                 if ($Report) {
                     Report-NinjaBuild (Join-Path $BinaryDirectory '.ninja_log') $StartTime
                 }
