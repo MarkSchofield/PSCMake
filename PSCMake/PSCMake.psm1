@@ -145,6 +145,9 @@ function ConfigureCMake {
     Write-Verbose "CMake Arguments: $CMakeArguments"
 
     & $CMake @CMakeArguments
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Configuration failed. Command line: '$($CMake.Source)' $($CMakeArguments -join ' ')"
+    }
 }
 
 <#
@@ -307,15 +310,21 @@ function Build-CMakeBuild {
                 $CMakeArguments = @(
                     '--build'
                     '--preset', $Preset
-                    if ($Targets) {
-                        '--target', $Targets
-                    }
                 )
+
+                if ($Targets) {
+                    $CMakeArguments += '--target'
+                    $CMakeArguments += $Targets
+                }
 
                 Write-Verbose "CMake Arguments: $CMakeArguments"
 
                 $StartTime = [datetime]::Now
                 & $CMake @CMakeArguments (($Configuration)?('--config', $Configuration):$null)
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Error "Build failed. Command line: '$($CMake.Source)' $($CMakeArguments -join ' ')"
+                }
+
                 if ($Report) {
                     Report-NinjaBuild (Join-Path $BinaryDirectory '.ninja_log') $StartTime
                 }
