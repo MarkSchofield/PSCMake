@@ -278,12 +278,14 @@ function Build-CMakeBuild {
             $CMakeCacheFile = Join-Path -Path $BinaryDirectory -ChildPath 'CMakeCache.txt'
 
             # Run CMake configure if;
-            #  1) "$BinaryDirectory/CMakeCache.txt" doesn't exist
-            #  2) '-configure' was specified
-            #  3) '-fresh' was specified
-            if ((-not (Test-Path -Path $CMakeCacheFile -PathType Leaf)) -or
-                $Configure -or
-                $Fresh) {
+            #  1) '-configure' was specified
+            #  2) '-fresh' was specified
+            #  3) "$BinaryDirectory/CMakeCache.txt" doesn't exist
+            #  4) The "Get-CMakeBuildCodeModelDirectory" folder doesn't exist
+            if ($Configure -or
+                $Fresh -or
+                (-not (Test-Path -Path $CMakeCacheFile -PathType Leaf)) -or
+                (-not (Test-Path -Path (Get-CMakeBuildCodeModelDirectory $BinaryDirectory) -PathType Container))) {
                 ConfigureCMake $CMake $CMakePresetsJson $ConfigurePreset -Fresh:$Fresh
             }
 
