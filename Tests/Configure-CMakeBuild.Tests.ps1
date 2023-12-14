@@ -93,4 +93,23 @@ Describe 'Configure-CMakeBuild' {
                 Should -Throw "Unable to find configuration preset 'linux-x64' in $PSScriptRoot\ReferenceBuild\CMakePresets.json"
         }
     }
+
+    It 'Passes a single extra argument to CMake' {
+        Using-Location "$PSScriptRoot/ReferenceBuild" {
+            Configure-CMakeBuild -Arguments '-Wno-dev'
+
+            $script:CMakeCalls | Should -HaveCount 1
+            $script:CMakeCalls[0] | Should -Be @('--preset', 'windows-x64', '-Wno-dev')
+        }
+    }
+
+    It 'Passes multiple extra arguments to CMake' {
+        Using-Location "$PSScriptRoot/ReferenceBuild" {
+            Configure-CMakeBuild -Arguments '-Wno-dev', '-DFOO=BAR'
+
+            $script:CMakeCalls | Should -HaveCount 1
+            $script:CMakeCalls[0] | Should -Be @('--preset', 'windows-x64', '-Wno-dev', '-DFOO=BAR')
+        }
+    }
+
 }
