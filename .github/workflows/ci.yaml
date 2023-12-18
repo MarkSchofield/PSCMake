@@ -47,7 +47,7 @@ jobs:
         run: |
           & .\Build\Publish.ps1 -Verbose
       - name: Upload __packages
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: __packages
           path: __packages
