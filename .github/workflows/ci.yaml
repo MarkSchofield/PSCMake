@@ -35,7 +35,7 @@ jobs:
             }
           }
           Invoke-Pester -Configuration $Configuration
-      - uses: codecov/codecov-action@v3
+      - uses: codecov/codecov-action@v4
         with:
           files: '${{ env.GITHUB_WORKSPACE }}/Pester-Coverage.xml'
           flags: unittests
