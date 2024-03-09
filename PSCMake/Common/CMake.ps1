@@ -391,6 +391,27 @@ function Enable-CMakeBuildQuery {
         }
 }
 
+# For the 'code model' JSON that was found, load the full 'target' JSON to be able to find 'EXECUTABLE' targets.
+#
+function FilterExecutableTargets{
+    param (
+        $CodeModelDirectory,
+        $TargetTuplesCodeModel
+    )
+    $TargetJsons = $TargetTuplesCodeModel |
+        ForEach-Object {
+            Join-Path -Path $CodeModelDirectory -ChildPath $_.jsonFile |
+                Get-Item |
+                Get-Content |
+                ConvertFrom-Json
+        }
+
+    $TargetJsons |
+        Where-Object {
+        $_.type -eq 'EXECUTABLE'
+    }
+}
+
 function Get-CMakeBuildCodeModelDirectory {
     param(
         [string] $BinaryDirectory

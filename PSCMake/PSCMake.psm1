@@ -103,6 +103,40 @@ function BuildTargetsCompleter {
 
 <#
  .Synopsis
+  An argument-completer for `Build-CMakeBuild`'s `-Targets` parameter.
+#>
+function ExecutableTargetsCompleter {
+    param(
+        $CommandName,
+        $ParameterName,
+        $WordToComplete,
+        $CommandAst,
+        $FakeBoundParameters
+    )
+    $CMakePresetsJson = GetCMakePresets -Silent
+    $PresetNames = GetBuildPresetNames $CMakePresetsJson
+    $PresetName = $FakeBoundParameters['Presets'] ?? $PresetNames |
+        Select-Object -First 1
+    $BuildPreset, $ConfigurePreset = ResolvePresets $CMakePresetsJson 'buildPresets' $PresetName
+    $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
+    $CMakeCodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
+
+    # TODO: See if the $BuildPreset has a configuration.
+    $ConfigurationName = $FakeBoundParameters['Configurations'] ?? $CMakeCodeModel.configurations.Name |
+        Select-Object -First 1
+    $ConfigurationsJson = $CMakeCodeModel.configurations |
+        Where-Object -Property 'name' -EQ $ConfigurationName
+
+    $TargetTuplesCodeModel = $ConfigurationsJson.targets |
+        Where-Object { $_.name -ilike "$WordToComplete*" }
+
+    # Use the 'code model' JSON to load the target-specific JSON to filter to targets with 'type' equal to 'EXECUTABLE'
+    $TargetTuples = FilterExecutableTargets (Get-CMakeBuildCodeModelDirectory $BinaryDirectory) $TargetTuplesCodeModel
+    $TargetTuples.name
+}
+
+<#
+ .Synopsis
   An argument-completer for `Configure-CMakeBuild`'s `-Presets` parameter.
 #>
 function ConfigurePresetsCompleter {
@@ -446,19 +480,8 @@ function Invoke-CMakeOutput {
         GetScopedTargets $CodeModel $Configuration $ScopeLocation
     }
 
-    # For the 'code model' JSON that was found, load the full 'target' JSON to be able to find 'EXECUTABLE' targets.
-    #
-    $TargetTuples = $TargetTuplesCodeModel |
-        ForEach-Object {
-            Join-Path -Path (Get-CMakeBuildCodeModelDirectory $BinaryDirectory) -ChildPath $_.jsonFile |
-                Get-Item |
-                Get-Content |
-                ConvertFrom-Json
-        }
-    $ExecutableTargetTuples = $TargetTuples |
-        Where-Object {
-            $_.type -eq 'EXECUTABLE'
-        }
+    # Use the 'code model' JSON to load the target-specific JSON to filter to targets with 'type' equal to 'EXECUTABLE'
+    $ExecutableTargetTuples = FilterExecutableTargets (Get-CMakeBuildCodeModelDirectory $BinaryDirectory) $TargetTuplesCodeModel
     $Count = ($ExecutableTargetTuples | Measure-Object).Count
     if ($Count -eq 0) {
         Write-Error "No executable target in scope."
@@ -490,7 +513,7 @@ function Invoke-CMakeOutput {
 
 Register-ArgumentCompleter -CommandName Invoke-CMakeOutput -ParameterName Preset -ScriptBlock $function:BuildPresetsCompleter
 Register-ArgumentCompleter -CommandName Invoke-CMakeOutput -ParameterName Configuration -ScriptBlock $function:BuildConfigurationsCompleter
-Register-ArgumentCompleter -CommandName Invoke-CMakeOutput -ParameterName Target -ScriptBlock $function:BuildTargetsCompleter
+Register-ArgumentCompleter -CommandName Invoke-CMakeOutput -ParameterName Target -ScriptBlock $function:ExecutableTargetsCompleter
 
 Register-ArgumentCompleter -CommandName Build-CMakeBuild -ParameterName Presets -ScriptBlock $function:BuildPresetsCompleter
 Register-ArgumentCompleter -CommandName Build-CMakeBuild -ParameterName Configurations -ScriptBlock $function:BuildConfigurationsCompleter
