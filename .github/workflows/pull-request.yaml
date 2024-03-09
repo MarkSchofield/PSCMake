@@ -5,6 +5,8 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    environment:
+      name: General
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,7 +24,7 @@ jobs:
             CodeCoverage = @{
               Enabled = $true
               OutputFormat = 'JaCoCo'
-              OutputPath = '${{ env.GITHUB_WORKSPACE }}/Pester-Coverage.xml'
+              OutputPath = '${{ github.workspace }}/Pester-Coverage.xml'
             }
           }
           Invoke-Pester -Configuration $Configuration

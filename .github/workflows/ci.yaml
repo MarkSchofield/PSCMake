@@ -14,6 +14,8 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    environment:
+      name: General
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,15 +33,16 @@ jobs:
             CodeCoverage = @{
               Enabled = $true
               OutputFormat = 'JaCoCo'
-              OutputPath = '${{ env.GITHUB_WORKSPACE }}/Pester-Coverage.xml'
+              OutputPath = '${{ github.workspace }}/Pester-Coverage.xml'
             }
           }
           Invoke-Pester -Configuration $Configuration
       - uses: codecov/codecov-action@v4
         with:
-          files: '${{ env.GITHUB_WORKSPACE }}/Pester-Coverage.xml'
+          files: '${{ github.workspace }}/Pester-Coverage.xml'
           flags: unittests
           name: codecov-umbrella
+          token: '${{ secrets.CODECOV_TOKEN }}'
           fail_ci_if_error: true
           verbose: true
       - name: Build
