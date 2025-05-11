@@ -521,16 +521,32 @@ function WriteDgml {
     $Targets = @{}
     '<?xml version="1.0" encoding="utf-8"?>'
     '<DirectedGraph xmlns="http://schemas.microsoft.com/vs/2009/dgml">'
+        '<Properties>'
+            '<Property Id="Definition" Label="Definition" DataType="System.String" IsReference="True" />'
+            '<Property Id="Type" DataType="System.String" />'
+        '</Properties>'
+        '<Styles>'
+            '<Style TargetType="Node" GroupLabel="Executable" ValueLabel="Executable">'
+                '<Condition Expression="Type=''EXECUTABLE''" />'
+                '<Setter Property="Background" Value="#FF0000" />'
+            '</Style>'
+        '</Styles>'
+        $SourcePath = $CodeModel.paths.source
         '<Nodes>'
             ($CodeModel.configurations | Where-Object { $_.name -eq $Configuration }).targets |
                 ForEach-Object {
+                    $TargetJson = Get-Content (Join-Path -Path $CodeModelDirectory -ChildPath $_.jsonFile) |
+                        ConvertFrom-Json
+
+                    $ReferenceFileIndex = $TargetJson.backtraceGraph.nodes[0].file
+                    $Definition = Join-Path -Path $SourcePath -ChildPath $TargetJson.backtraceGraph.files[$ReferenceFileIndex]
+
                     '<Node'
                         "  Id=`"$($_.id)`""
                         "  Label=`"$($_.name)`""
+                        "  Type=`"$($TargetJson.type)`""
+                        "  Definition=`"$($Definition)`""
                         '/>'
-
-                    $TargetJson = Get-Content (Join-Path -Path $CodeModelDirectory -ChildPath $_.jsonFile) |
-                        ConvertFrom-Json
 
                     Get-MemberValue -InputObject $TargetJson -Name artifacts -Or @() |
                         ForEach-Object {
