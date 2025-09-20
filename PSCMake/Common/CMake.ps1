@@ -30,7 +30,6 @@ $ErrorActionPreference = 'Stop'
 
 $PEnv = Get-ChildItem env: | ToHashTable
 
-$PreviousLocation = $null
 $CMakeCandidates = @(
     (Get-Command 'cmake' -ErrorAction SilentlyContinue)
     if ($IsWindows) {
@@ -44,13 +43,7 @@ $CMakeCandidates = @(
 #>
 function FindCMakeRoot {
     $CurrentLocation = (Get-Location).Path
-    if ($CurrentLocation -ne $script:PreviousLocation) {
-        Write-Verbose "PreviousLocation = $script:PreviousLocation"
-        Write-Verbose "CurrentLocation = $CurrentLocation"
-        $script:PreviousLocation = $CurrentLocation
-        $script:CMakeRoot = GetPathOfFileAbove $CurrentLocation 'CMakePresets.json'
-    }
-    $script:CMakeRoot
+    GetPathOfFileAbove $CurrentLocation 'CMakePresets.json'
 }
 
 $script:CMakePresetsPath = $null
@@ -478,13 +471,14 @@ function GetScopedTargets {
     } else {
         $CodeModel.configurations[0]
     }
+    $SourceDir = $CodeModel.paths.source
     $CodeModelConfiguration.targets |
         Where-Object {
             $Folder = $CodeModelConfiguration.directories[$_.directoryIndex].build
             $Folder = if ($Folder -eq '.') {
-                $CMakeRoot
+                $SourceDir
             } else {
-                Join-Path -Path $CMakeRoot -ChildPath $Folder
+                Join-Path -Path $SourceDir -ChildPath $Folder
             }
             $Folder.StartsWith($ScopeLocation)
         }
