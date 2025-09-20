@@ -194,7 +194,7 @@ function ConfigureCMake {
  .Parameter Presets
   The configure preset names to use.
 
-.Parameter Fresh
+ .Parameter Fresh
   A switch specifying whether a 'fresh' configuration is performed - removing any existing cache.
 
  .Example
@@ -432,7 +432,7 @@ function Write-CMakeBuild {
 
 #>
 function Invoke-CMakeOutput {
-    [CmdletBinding(PositionalBinding=$false)]
+    [CmdletBinding(PositionalBinding = $false)]
     param(
         [Parameter()]
         [string] $Preset,

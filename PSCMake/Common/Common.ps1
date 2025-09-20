@@ -40,7 +40,7 @@ function Get-MemberValue {
  .Synopsis
   Performs linear interpolation from the first color to the second.
 #>
-function ColorInterpolation{
+function ColorInterpolation {
     param(
         [System.Drawing.Color]$FromColor,
         [System.Drawing.Color]$ToColor,

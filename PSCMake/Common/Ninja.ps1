@@ -43,18 +43,18 @@ function TryParseNinjaLog {
     )
     if (Test-Path -Path $NinjaLogPath -PathType Leaf) {
         Get-Content $NinjaLogPath |
-            Where-Object {$_[0] -ne '#'} |
+            Where-Object { $_[0] -ne '#' } |
             ForEach-Object {
                 $Tokens = $_ -split "\t"
                 [int]$StartTime = $Tokens[0]
                 [int]$EndTime = $Tokens[1]
                 [pscustomobject]@{
-                    StartTime=$StartTime
-                    EndTime=$EndTime
-                    WriteTime=([long]$Tokens[2])
-                    File=$Tokens[3]
-                    CommandHash=$Tokens[4]
-                    Duration=($EndTime - $StartTime)
+                    StartTime   = $StartTime
+                    EndTime     = $EndTime
+                    WriteTime   = ([long]$Tokens[2])
+                    File        = $Tokens[3]
+                    CommandHash = $Tokens[4]
+                    Duration    = ($EndTime - $StartTime)
                 }
             }
     }
@@ -97,7 +97,7 @@ function Report-NinjaBuild {
     )
     $BuildStartNinjaTime = ConvertTo-NinjaTime $BuildStartTime
     $Entries = (TryParseNinjaLog $NinjaLogPath) |
-        Where-Object {$_.WriteTime -ge $BuildStartNinjaTime}
+        Where-Object { $_.WriteTime -ge $BuildStartNinjaTime }
     $Statistics = $Entries | Measure-Object -Property Duration -Maximum
     if (-not $Statistics) {
         return

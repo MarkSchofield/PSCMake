@@ -15,17 +15,21 @@ AfterAll {
 Describe 'Using-Location' {
     It 'Navigates to the given location and back again afterwards.' {
         Set-Location $PSScriptRoot
+
         Using-Location $TestFolder {
             Get-Location |
                 Should -Be $TestFolder
         }
+
         Get-Location |
             Should -Be $PSScriptRoot
     }
     It 'Restores the location when the scriptlet fails.' {
         Set-Location $PSScriptRoot
-        {Using-Location $TestFolder { Write-Error "Oh no!" } } |
+
+        { Using-Location $TestFolder { Write-Error "Oh no!" } } |
             Should -Throw
+
         Get-Location |
             Should -Be $PSScriptRoot
     }

@@ -4,9 +4,9 @@ BeforeAll {
     . $PSScriptRoot/../PSCMake/Common/CMake.ps1
 
     Mock GetMacroConstants { @{
-        '${hostSystemName}'='Linux'
-        '$vendor{PSCMake}'='true'
-    } }
+            '${hostSystemName}' = 'Linux'
+            '$vendor{PSCMake}'  = 'true'
+        } }
 }
 
 Describe 'EvaluateCondition' {

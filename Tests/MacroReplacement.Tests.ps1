@@ -6,9 +6,9 @@ BeforeAll {
     $env:PSCMAKE_ENV_TEST = 43
 
     Mock GetMacroConstants { @{
-        '${hostSystemName}'='Linux'
-        '$vendor{PSCMake}'='true'
-    } }
+            '${hostSystemName}' = 'Linux'
+            '$vendor{PSCMake}'  = 'true'
+        } }
 
     Mock GetCMakePresetsPath {
         'C:\chunky\bacon\CMakePresets.json'
