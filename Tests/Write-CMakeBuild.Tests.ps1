@@ -26,7 +26,7 @@ digraph CodeModel {
 }
 '@
             ((Write-CMakeBuild) -join '') |
-              Should -Be ($ExpectedDotFile -replace '\r\n','')
+                Should -Be ($ExpectedDotFile -replace '\r\n', '')
         }
     }
 }

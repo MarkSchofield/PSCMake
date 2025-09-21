@@ -96,11 +96,11 @@ function GetBuildPresetNames {
         # Filter presets that have configure presets that have conditions that evaluate to $false
         $Presets = $Presets | Where-Object {
             $BuildPresetJson = $_
-            $ConfigurePresetJson = $CMakePresetsJson.configurePresets |
-                Where-Object { $_.name -eq $BuildPresetJson.configurePreset } |
-                Where-Object { EvaluatePresetCondition $_ $CMakePresetsJson.configurePresets }
+            $ConfigurePresetJson = $CMakePresetsJson.configurePresets | Where-Object { $_.name -eq $BuildPresetJson.configurePreset } | Where-Object { EvaluatePresetCondition $_ $CMakePresetsJson.configurePresets }
+
             $null -ne $ConfigurePresetJson
         }
+
         $Presets.name
     }
 }
@@ -218,8 +218,7 @@ function EvaluateCondition {
         $ConditionJson,
         $PresetJson
     )
-    switch ($ConditionJson.type)
-    {
+    switch ($ConditionJson.type) {
         'equals' {
             return (MacroReplacement $ConditionJson.lhs $PresetJson) -eq (MacroReplacement $ConditionJson.rhs $PresetJson)
         }
@@ -302,8 +301,8 @@ function GetMacroConstants {
     }
 
     @{
-        '${hostSystemName}'=$HostSystemName
-        '$vendor{PSCMake}'='true'
+        '${hostSystemName}' = $HostSystemName
+        '$vendor{PSCMake}'  = 'true'
     }
 }
 
@@ -386,7 +385,7 @@ function Enable-CMakeBuildQuery {
 
 # For the 'code model' JSON that was found, load the full 'target' JSON to be able to find 'EXECUTABLE' targets.
 #
-function FilterExecutableTargets{
+function FilterExecutableTargets {
     param (
         $CodeModelDirectory,
         $TargetTuplesCodeModel
@@ -397,12 +396,12 @@ function FilterExecutableTargets{
                 Get-Item |
                 Get-Content |
                 ConvertFrom-Json
-        }
+            }
 
     $TargetJsons |
         Where-Object {
-        $_.type -eq 'EXECUTABLE'
-    }
+            $_.type -eq 'EXECUTABLE'
+        }
 }
 
 function Get-CMakeBuildCodeModelDirectory {

@@ -104,7 +104,7 @@ function IsVirtualTerminalProcessingEnabled {
  .Synopsis
   Returns the control codes to set the foreground color to the specified value.
 #>
-function ColorToControlCode{
+function ColorToControlCode {
     param(
         [System.Drawing.Color]$Color
     )
@@ -117,7 +117,7 @@ function ColorToControlCode{
  .Synopsis
   Returns the control codes to reset foreground attributes, if virtual terminal processing is enable.
 #>
-function ResetForegroundControlCode{
+function ResetForegroundControlCode {
     if (IsVirtualTerminalProcessingEnabled) {
         "`e[39m"
     }
