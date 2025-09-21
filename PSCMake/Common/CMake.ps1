@@ -131,12 +131,12 @@ function GetConfigurePresetNames {
     Finds the 'CMake' command.
 #>
 function GetCMake {
-    $CMake = Get-Variable -Name 'CMake' -ValueOnly -Scope global -ErrorAction SilentlyContinue
+    $CMake = Get-Variable -Name 'CMake' -ValueOnly -Scope script -ErrorAction SilentlyContinue
     if (-not $CMake) {
         foreach ($CMakeCandidate in $CMakeCandidates) {
             $CMake = Get-Command $CMakeCandidate -ErrorAction SilentlyContinue
             if ($CMake) {
-                $global:CMake = $CMake
+                $script:CMake = $CMake
                 break
             }
         }
@@ -280,7 +280,7 @@ function GetBinaryDirectory {
         $CMakePresetsJson,
         $ConfigurePreset
     )
-    $BinaryDirectory = ResolvePresetProperty $CMakePresetsJson $ConfigurePreset 'binaryDir'
+    $BinaryDirectory = ResolvePresetProperty -CMakePresetsJson $CMakePresetsJson $ConfigurePreset 'binaryDir'
 
     # Perform macro-replacement
     $Result = MacroReplacement $BinaryDirectory $ConfigurePreset

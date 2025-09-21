@@ -3,13 +3,13 @@
 BeforeAll {
     . $PSScriptRoot/../PSCMake/Common/Common.ps1
 
-    $OriginalLocation = Get-Location
+    $script:OriginalLocation = Get-Location
     $TestFolder = Join-Path -Path $PSScriptRoot -ChildPath '__test'
     $null = New-Item -Path $TestFolder -ItemType Directory -Force -ErrorAction SilentlyContinue
 }
 
 AfterAll {
-    Set-Location $OriginalLocation
+    Set-Location $script:OriginalLocation
 }
 
 Describe 'Using-Location' {

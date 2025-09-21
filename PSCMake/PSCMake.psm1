@@ -42,6 +42,10 @@ function BuildPresetsCompleter {
         $CommandAst,
         $FakeBoundParameters
     )
+    $null = $CommandName
+    $null = $ParameterName
+    $null = $CommandAst
+    $null = $FakeBoundParameters
     $CMakePresetsJson = GetCMakePresets -Silent
     GetBuildPresetNames $CMakePresetsJson | Where-Object { $_ -ilike "$WordToComplete*" }
 }
@@ -58,6 +62,11 @@ function BuildConfigurationsCompleter {
         $CommandAst,
         $FakeBoundParameters
     )
+    $null = $CommandName
+    $null = $ParameterName
+    $null = $CommandAst
+    $null = $FakeBoundParameters
+
     # TODO: A meaningful implementation would:
     #   * If a buildPreset can be resolved, see if it has a `configuration` and use that.
     #   * If not, look for a code model and use that.
@@ -83,6 +92,9 @@ function BuildTargetsCompleter {
         $CommandAst,
         $FakeBoundParameters
     )
+    $null = $CommandName
+    $null = $ParameterName
+    $null = $CommandAst
     $CMakePresetsJson = GetCMakePresets -Silent
     $PresetNames = GetBuildPresetNames $CMakePresetsJson
     $PresetName = $FakeBoundParameters['Presets'] ?? $PresetNames |
@@ -127,6 +139,9 @@ function ExecutableTargetsCompleter {
         $CommandAst,
         $FakeBoundParameters
     )
+    $null = $CommandName
+    $null = $ParameterName
+    $null = $CommandAst
     $CMakePresetsJson = GetCMakePresets -Silent
     $PresetNames = GetBuildPresetNames $CMakePresetsJson
     $PresetName = $FakeBoundParameters['Presets'] ?? $PresetNames |
@@ -161,6 +176,10 @@ function ConfigurePresetsCompleter {
         $CommandAst,
         $FakeBoundParameters
     )
+    $null = $CommandName
+    $null = $ParameterName
+    $null = $CommandAst
+    $null = $FakeBoundParameters
     $CMakePresetsJson = GetCMakePresets -Silent
     GetConfigurePresetNames $CMakePresetsJson | Where-Object { $_ -ilike "$WordToComplete*" }
 }
@@ -242,7 +261,7 @@ function Configure-CMakeBuild {
                 Write-Error "Unable to find configuration preset '$Preset' in $script:CMakePresetsPath"
             }
 
-            ConfigureCMake $CMake $CMakePresetsJson $ConfigurePreset -Fresh:$Fresh
+            ConfigureCMake -CMake $CMake $CMakePresetsJson $ConfigurePreset -Fresh:$Fresh
         }
     }
 }
@@ -337,7 +356,7 @@ function Build-CMakeBuild {
                 $Fresh -or
                 (-not (Test-Path -Path $CMakeCacheFile -PathType Leaf)) -or
                 (-not (Test-Path -Path (Get-CMakeBuildCodeModelDirectory $BinaryDirectory) -PathType Container))) {
-                ConfigureCMake $CMake $CMakePresetsJson $ConfigurePreset -Fresh:$Fresh
+                ConfigureCMake -CMake $CMake $CMakePresetsJson $ConfigurePreset -Fresh:$Fresh
             }
 
             $CodeModel = Get-CMakeBuildCodeModel $BinaryDirectory

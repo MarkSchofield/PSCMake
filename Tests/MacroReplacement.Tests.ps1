@@ -14,7 +14,7 @@ BeforeAll {
         'C:\chunky\bacon\CMakePresets.json'
     }
 
-    $PresetJson = ConvertFrom-Json -InputObject @'
+    $script:PresetJson = ConvertFrom-Json -InputObject @'
     {
         "name": "windows-x64",
         "configurePreset": "windows-x64"
