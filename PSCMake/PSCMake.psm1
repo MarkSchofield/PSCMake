@@ -97,6 +97,20 @@ function BuildTargetsCompleter {
     $ConfigurationsJson = $CMakeCodeModel.configurations |
         Where-Object -Property 'name' -EQ $ConfigurationName
     $TargetNames = $ConfigurationsJson.targets.name
+
+    # Add standard CMake targets 'all', 'clean', 'install'
+    $TargetNames += @(
+        'all'
+        'clean'
+        'install'
+    )
+
+    # Add standard CMake target 'test' if 'CTestTestfile.cmake' exists in the binary directory.
+    $CTestFilePath = Join-Path -Path $BinaryDirectory -ChildPath 'CTestTestfile.cmake'
+    if (Test-Path -Path $CTestFilePath -PathType Leaf -ErrorAction SilentlyContinue) {
+        $TargetNames += 'test'
+    }
+
     $TargetNames |
         Where-Object { $_ -ilike "$WordToComplete*" }
 }

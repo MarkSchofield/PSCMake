@@ -20,10 +20,13 @@ Describe 'BuildTargetsCompleter' {
         Using-Location "$PSScriptRoot/ReferenceBuild" {
             $Completions = Get-CommandCompletions "Build-CMakeBuild -Targets "
 
-            $Completions.CompletionMatches.Count | Should -Be 3
+            $Completions.CompletionMatches.Count | Should -Be 6
             $Completions.CompletionMatches[0].CompletionText | Should -Be 'A_Library'
             $Completions.CompletionMatches[1].CompletionText | Should -Be 'B_Library'
             $Completions.CompletionMatches[2].CompletionText | Should -Be 'C_Library'
+            $Completions.CompletionMatches[3].CompletionText | Should -Be 'all'
+            $Completions.CompletionMatches[4].CompletionText | Should -Be 'clean'
+            $Completions.CompletionMatches[5].CompletionText | Should -Be 'install'
         }
     }
 }
