@@ -97,14 +97,14 @@ function BuildTargetsCompleter {
     $null = $CommandAst
     $CMakePresetsJson = GetCMakePresets -Silent
     $PresetNames = GetBuildPresetNames $CMakePresetsJson
-    $PresetName = $FakeBoundParameters['Presets'] ?? $PresetNames |
+    $PresetName = $FakeBoundParameters['Preset'] ?? $PresetNames |
         Select-Object -First 1
     $BuildPreset, $ConfigurePreset = ResolvePresets $CMakePresetsJson 'buildPresets' $PresetName
     $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
     $CMakeCodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
 
     # TODO: See if the $BuildPreset has a configuration.
-    $ConfigurationName = $FakeBoundParameters['Configurations'] ?? $CMakeCodeModel.configurations.Name |
+    $ConfigurationName = $FakeBoundParameters['Configuration'] ?? $CMakeCodeModel.configurations.Name |
         Select-Object -First 1
     $ConfigurationsJson = $CMakeCodeModel.configurations |
         Where-Object -Property 'name' -EQ $ConfigurationName
@@ -166,7 +166,7 @@ function ExecutableTargetsCompleter {
 
 <#
     .Synopsis
-    An argument-completer for `Configure-CMakeBuild`'s `-Presets` parameter.
+    An argument-completer for `Configure-CMakeBuild`'s `-Preset` parameter.
 #>
 function ConfigurePresetsCompleter {
     param(
@@ -209,9 +209,8 @@ function ConfigureCMake {
             '--log-level=VERBOSE'
         }
     )
-    Write-Verbose "CMake Arguments: $CMakeArguments"
 
-    & $CMake @CMakeArguments
+    InvokeCMake $CMake $CMakeArguments
     if ($LASTEXITCODE -ne 0) {
         Write-Error "Configuration failed. Command line: '$($CMake.Source)' $($CMakeArguments -join ' ')"
     }
@@ -224,41 +223,46 @@ function ConfigureCMake {
     .Description
     Configures the specified 'configurePresets' entries from a CMakePresets.json file in the current-or-higher folder.
 
-    .Parameter Presets
-    The configure preset names to use.
+    .Parameter Preset
+    The configure preset name to use. Multiple presets can be specified.
 
     .Parameter Fresh
     A switch specifying whether a 'fresh' configuration is performed - removing any existing cache.
 
     .Example
     # Configure the 'windows-x64' and 'windows-x86' CMake builds.
-    Configure-CMakeBuild -Presets windows-x64,windows-x86
+    Configure-CMakeBuild -Preset windows-x64,windows-x86
 #>
 function Configure-CMakeBuild {
     [CmdletBinding()]
     param(
+        [Alias('Presets')]
+        [SupportsWildcards()]
         [Parameter()]
-        [string[]] $Presets,
+        [string[]] $Preset,
 
         [Parameter()]
         [switch] $Fresh
     )
     $CMakeRoot = FindCMakeRoot
     $CMakePresetsJson = GetCMakePresets
-    $PresetNames = GetConfigurePresetNames $CMakePresetsJson
-    if (-not $Presets) {
-        $Presets = $PresetNames | Select-Object -First 1
-        Write-Information "No preset specified, defaulting to: $Presets"
+    $ConfigurePresetNames = GetConfigurePresetNames $CMakePresetsJson
+    $ConfigurePresetNames = if (-not $Preset) {
+        $ConfigurePresetNames | Select-Object -First 1
+    } else {
+        foreach ($CandidatePreset in $Preset) {
+            $ConfigurePresetNames | Where-Object { $_ -like $CandidatePreset }
+        }
     }
 
     $CMake = GetCMake
     Using-Location $CMakeRoot {
-        foreach ($Preset in $Presets) {
-            Write-Output "Preset         : $Preset"
+        foreach ($ConfigurePresetName in $ConfigurePresetNames) {
+            Write-Output "Preset         : $ConfigurePresetName"
 
-            $ConfigurePreset = $CMakePresetsJson.configurePresets | Where-Object { $_.name -eq $Preset }
+            $ConfigurePreset = $CMakePresetsJson.configurePresets | Where-Object { $_.name -eq $ConfigurePresetName }
             if (-not $ConfigurePreset) {
-                Write-Error "Unable to find configuration preset '$Preset' in $script:CMakePresetsPath"
+                Write-Error "Unable to find configuration preset '$ConfigurePresetName' in $script:CMakePresetsPath"
             }
 
             ConfigureCMake -CMake $CMake $CMakePresetsJson $ConfigurePreset -Fresh:$Fresh
@@ -273,11 +277,11 @@ function Configure-CMakeBuild {
     .Description
     Builds the specified 'buildPresets' entries from a CMakePresets.json file in the current-or-higher folder.
 
-    .Parameter Presets
+    .Parameter Preset
 
-    .Parameter Configurations
+    .Parameter Configuration
 
-    .Parameter Targets
+    .Parameter Target
     One or more
 
     .Parameter Configure
@@ -291,26 +295,31 @@ function Configure-CMakeBuild {
 
     .Example
     # Build the 'windows-x64' and 'windows-x86' CMake builds.
-    Build-CMakeBuild -Presets windows-x64,windows-x86
+    Build-CMakeBuild -Preset windows-x64,windows-x86
 
     # Build the 'windows-x64' and 'windows-x86' CMake builds, with the 'Release' configuration.
-    Build-CMakeBuild -Presets windows-x64,windows-x86 -Configurations Release
+    Build-CMakeBuild -Preset windows-x64,windows-x86 -Configuration Release
 
     # Build the 'HelperLibrary' target, for the 'windows-x64' and 'windows-x86' CMake builds, with the 'Release'
     # configuration.
-    Build-CMakeBuild -Presets windows-x64,windows-x86 -Configurations Release -Targets HelperLibrary
+    Build-CMakeBuild -Preset windows-x64,windows-x86 -Configuration Release -Target HelperLibrary
 #>
 function Build-CMakeBuild {
     [CmdletBinding()]
     param(
+        [Alias('Presets')]
+        [SupportsWildcards()]
         [Parameter(Position = 0)]
-        [string[]] $Presets,
+        [string[]] $Preset,
 
+        [Alias('Configurations')]
+        [SupportsWildcards()]
         [Parameter(Position = 1)]
-        [string[]] $Configurations = @($null),
+        [string[]] $Configuration,
 
+        [Alias('Targets')]
         [Parameter(Position = 2)]
-        [string[]] $Targets,
+        [string[]] $Target,
 
         [Parameter()]
         [switch] $Configure,
@@ -323,27 +332,30 @@ function Build-CMakeBuild {
     )
     $CMakeRoot = FindCMakeRoot
     $CMakePresetsJson = GetCMakePresets
-    $PresetNames = GetBuildPresetNames $CMakePresetsJson
-
-    if (-not $Presets) {
-        if (-not $PresetNames) {
+    $BuildPresetNames = GetBuildPresetNames $CMakePresetsJson
+    $BuildPresetNames = if (-not $Preset) {
+        if (-not $BuildPresetNames) {
             Write-Error "No Presets values specified, and one could not be inferred."
         }
-        $Presets = $PresetNames | Select-Object -First 1
+        $BuildPresetNames | Select-Object -First 1
+    } else {
+        foreach ($CandidatePreset in $Preset) {
+            $BuildPresetNames | Where-Object { $_ -like $CandidatePreset }
+        }
     }
 
     # If;
     #   * no targets were specified, and
     #   * the current location is different from the cmake root
     # Then we're a scoped build!
-    $ScopedBuild = (-not $Targets) -and ($CMakeRoot -ne ((Get-Location).Path))
+    $ScopedBuild = (-not $Target) -and ($CMakeRoot -ne ((Get-Location).Path))
     $ScopeLocation = (Get-Location).Path
     $CMake = GetCMake
     Using-Location $CMakeRoot {
-        foreach ($Preset in $Presets) {
-            Write-Output "Preset         : $Preset"
+        foreach ($BuildPresetName in $BuildPresetNames) {
+            Write-Output "Preset         : $BuildPresetName"
 
-            $BuildPreset, $ConfigurePreset = ResolvePresets $CMakePresetsJson 'buildPresets' $Preset
+            $BuildPreset, $ConfigurePreset = ResolvePresets $CMakePresetsJson 'buildPresets' $BuildPresetName
             $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
             $CMakeCacheFile = Join-Path -Path $BinaryDirectory -ChildPath 'CMakeCache.txt'
 
@@ -361,33 +373,39 @@ function Build-CMakeBuild {
 
             $CodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
 
-            foreach ($Configuration in $Configurations) {
-                Write-Output "Configuration  : $Configuration"
+            [string[]] $ConfigurationNames = @($null)
+            if ($Configuration) {
+                $ConfigurationNames = foreach ($CandidateConfigurationName in $Configuration) {
+                    $CodeModel.configurations.name | Where-Object { $_ -like $CandidateConfigurationName }
+                }
+            }
 
-                if ($ScopedBuild) {
-                    $TargetTuples = GetScopedTargets $CodeModel $Configuration $ScopeLocation
-                    $Targets = if ($TargetTuples) {
+            foreach ($ConfigurationName in $ConfigurationNames) {
+                Write-Output "Configuration  : $ConfigurationName"
+
+                $TargetNames = if ($ScopedBuild) {
+                    $TargetTuples = GetScopedTargets $CodeModel $ConfigurationName $ScopeLocation
+                    if ($TargetTuples) {
                         $TargetTuples.name
-                    } else {
-                        @()
                     }
-                    Write-Output "Scoped Targets : $Targets"
+                } else {
+                    $Target
                 }
 
                 $CMakeArguments = @(
                     '--build'
-                    '--preset', $Preset
+                    '--preset', $BuildPresetName
+                    if ($ConfigurationName) {
+                        '--config', $ConfigurationName
+                    }
+                    if ($TargetNames) {
+                        '--target'
+                        $TargetNames
+                    }
                 )
 
-                if ($Targets) {
-                    $CMakeArguments += '--target'
-                    $CMakeArguments += $Targets
-                }
-
-                Write-Verbose "CMake Arguments: $CMakeArguments"
-
                 $StartTime = [datetime]::Now
-                & $CMake @CMakeArguments (($Configuration)?('--config', $Configuration):$null)
+                InvokeCMake $CMake $CMakeArguments
                 if ($LASTEXITCODE -ne 0) {
                     Write-Error "Build failed. Command line: '$($CMake.Source)' $($CMakeArguments -join ' ')"
                 }
@@ -498,7 +516,7 @@ function Invoke-CMakeOutput {
     #
     $CodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
     if (-not $CodeModel) {
-        Configure-CMakeBuild -Presets $Preset
+        Configure-CMakeBuild -Preset $Preset
         $CodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
     }
 
@@ -547,11 +565,11 @@ Register-ArgumentCompleter -CommandName Invoke-CMakeOutput -ParameterName Preset
 Register-ArgumentCompleter -CommandName Invoke-CMakeOutput -ParameterName Configuration -ScriptBlock $function:BuildConfigurationsCompleter
 Register-ArgumentCompleter -CommandName Invoke-CMakeOutput -ParameterName Target -ScriptBlock $function:ExecutableTargetsCompleter
 
-Register-ArgumentCompleter -CommandName Build-CMakeBuild -ParameterName Presets -ScriptBlock $function:BuildPresetsCompleter
-Register-ArgumentCompleter -CommandName Build-CMakeBuild -ParameterName Configurations -ScriptBlock $function:BuildConfigurationsCompleter
-Register-ArgumentCompleter -CommandName Build-CMakeBuild -ParameterName Targets -ScriptBlock $function:BuildTargetsCompleter
+Register-ArgumentCompleter -CommandName Build-CMakeBuild -ParameterName Preset -ScriptBlock $function:BuildPresetsCompleter
+Register-ArgumentCompleter -CommandName Build-CMakeBuild -ParameterName Configuration -ScriptBlock $function:BuildConfigurationsCompleter
+Register-ArgumentCompleter -CommandName Build-CMakeBuild -ParameterName Target -ScriptBlock $function:BuildTargetsCompleter
 
-Register-ArgumentCompleter -CommandName Configure-CMakeBuild -ParameterName Presets -ScriptBlock $function:ConfigurePresetsCompleter
+Register-ArgumentCompleter -CommandName Configure-CMakeBuild -ParameterName Preset -ScriptBlock $function:ConfigurePresetsCompleter
 
 Register-ArgumentCompleter -CommandName Write-CMakeBuild -ParameterName Preset -ScriptBlock $function:BuildPresetsCompleter
 Register-ArgumentCompleter -CommandName Write-CMakeBuild -ParameterName Configuration -ScriptBlock $function:BuildConfigurationsCompleter
