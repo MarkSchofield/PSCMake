@@ -74,11 +74,11 @@ function GetConsole {
 }
 
 <#
- .Synopsis
-  Returns whether virtual terminal processing is enabled for the current console.
+    .Synopsis
+    Returns whether virtual terminal processing is enabled for the current console.
 
- .Outputs
- `$true` if virtual terminal processing is enabled, `$false` otherwise.
+    .Outputs
+    `$true` if virtual terminal processing is enabled, `$false` otherwise.
 #>
 function IsVirtualTerminalProcessingEnabled {
     if ($null -eq $script:IsVirtualTerminalProcessingEnabled) {
@@ -101,8 +101,8 @@ function IsVirtualTerminalProcessingEnabled {
 }
 
 <#
- .Synopsis
-  Returns the control codes to set the foreground color to the specified value.
+    .Synopsis
+    Returns the control codes to set the foreground color to the specified value.
 #>
 function ColorToControlCode {
     param(
@@ -114,8 +114,8 @@ function ColorToControlCode {
 }
 
 <#
- .Synopsis
-  Returns the control codes to reset foreground attributes, if virtual terminal processing is enable.
+    .Synopsis
+    Returns the control codes to reset foreground attributes, if virtual terminal processing is enable.
 #>
 function ResetForegroundControlCode {
     if (IsVirtualTerminalProcessingEnabled) {

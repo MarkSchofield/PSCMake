@@ -31,8 +31,8 @@ $ErrorActionPreference = 'Stop'
 . $PSScriptRoot/Common/Ninja.ps1
 
 <#
- .Synopsis
-  An argument-completer for `Build-CMakeBuild`'s `-Preset` parameter.
+    .Synopsis
+    An argument-completer for `Build-CMakeBuild`'s `-Preset` parameter.
 #>
 function BuildPresetsCompleter {
     param(
@@ -47,8 +47,8 @@ function BuildPresetsCompleter {
 }
 
 <#
- .Synopsis
-  An argument-completer for `Build-CMakeBuild`'s `-Configurations` parameter.
+    .Synopsis
+    An argument-completer for `Build-CMakeBuild`'s `-Configurations` parameter.
 #>
 function BuildConfigurationsCompleter {
     param(
@@ -72,8 +72,8 @@ function BuildConfigurationsCompleter {
 }
 
 <#
- .Synopsis
-  An argument-completer for `Build-CMakeBuild`'s `-Targets` parameter.
+    .Synopsis
+    An argument-completer for `Build-CMakeBuild`'s `-Targets` parameter.
 #>
 function BuildTargetsCompleter {
     param(
@@ -116,8 +116,8 @@ function BuildTargetsCompleter {
 }
 
 <#
- .Synopsis
-  An argument-completer for `Build-CMakeBuild`'s `-Targets` parameter.
+    .Synopsis
+    An argument-completer for `Build-CMakeBuild`'s `-Targets` parameter.
 #>
 function ExecutableTargetsCompleter {
     param(
@@ -150,8 +150,8 @@ function ExecutableTargetsCompleter {
 }
 
 <#
- .Synopsis
-  An argument-completer for `Configure-CMakeBuild`'s `-Presets` parameter.
+    .Synopsis
+    An argument-completer for `Configure-CMakeBuild`'s `-Presets` parameter.
 #>
 function ConfigurePresetsCompleter {
     param(
@@ -199,21 +199,21 @@ function ConfigureCMake {
 }
 
 <#
- .Synopsis
-  Configures a CMake build.
+    .Synopsis
+    Configures a CMake build.
 
- .Description
-  Configures the specified 'configurePresets' entries from a CMakePresets.json file in the current-or-higher folder.
+    .Description
+    Configures the specified 'configurePresets' entries from a CMakePresets.json file in the current-or-higher folder.
 
- .Parameter Presets
-  The configure preset names to use.
+    .Parameter Presets
+    The configure preset names to use.
 
- .Parameter Fresh
-  A switch specifying whether a 'fresh' configuration is performed - removing any existing cache.
+    .Parameter Fresh
+    A switch specifying whether a 'fresh' configuration is performed - removing any existing cache.
 
- .Example
-   # Configure the 'windows-x64' and 'windows-x86' CMake builds.
-   Configure-CMakeBuild -Presets windows-x64,windows-x86
+    .Example
+    # Configure the 'windows-x64' and 'windows-x86' CMake builds.
+    Configure-CMakeBuild -Presets windows-x64,windows-x86
 #>
 function Configure-CMakeBuild {
     [CmdletBinding()]
@@ -248,38 +248,38 @@ function Configure-CMakeBuild {
 }
 
 <#
- .Synopsis
-  Builds a CMake build.
+    .Synopsis
+    Builds a CMake build.
 
- .Description
-  Builds the specified 'buildPresets' entries from a CMakePresets.json file in the current-or-higher folder.
+    .Description
+    Builds the specified 'buildPresets' entries from a CMakePresets.json file in the current-or-higher folder.
 
- .Parameter Presets
+    .Parameter Presets
 
- .Parameter Configurations
+    .Parameter Configurations
 
- .Parameter Targets
-   One or more
+    .Parameter Targets
+    One or more
 
- .Parameter Configure
-   A switch specifying whether the necessary configuration should be performed before the build is run.
+    .Parameter Configure
+    A switch specifying whether the necessary configuration should be performed before the build is run.
 
- .Parameter Report
-   [Exploration] A switch specifying whether a report should be written of the command times of the build. Ninja builds only.
+    .Parameter Report
+    [Exploration] A switch specifying whether a report should be written of the command times of the build. Ninja builds only.
 
- .Parameter Fresh
-   A switch specifying whether a 'fresh' configuration should be performed before the build is run.
+    .Parameter Fresh
+    A switch specifying whether a 'fresh' configuration should be performed before the build is run.
 
- .Example
-   # Build the 'windows-x64' and 'windows-x86' CMake builds.
-   Build-CMakeBuild -Presets windows-x64,windows-x86
+    .Example
+    # Build the 'windows-x64' and 'windows-x86' CMake builds.
+    Build-CMakeBuild -Presets windows-x64,windows-x86
 
-   # Build the 'windows-x64' and 'windows-x86' CMake builds, with the 'Release' configuration.
-   Build-CMakeBuild -Presets windows-x64,windows-x86 -Configurations Release
+    # Build the 'windows-x64' and 'windows-x86' CMake builds, with the 'Release' configuration.
+    Build-CMakeBuild -Presets windows-x64,windows-x86 -Configurations Release
 
-   # Build the 'HelperLibrary' target, for the 'windows-x64' and 'windows-x86' CMake builds, with the 'Release'
-   # configuration.
-   Build-CMakeBuild -Presets windows-x64,windows-x86 -Configurations Release -Targets HelperLibrary
+    # Build the 'HelperLibrary' target, for the 'windows-x64' and 'windows-x86' CMake builds, with the 'Release'
+    # configuration.
+    Build-CMakeBuild -Presets windows-x64,windows-x86 -Configurations Release -Targets HelperLibrary
 #>
 function Build-CMakeBuild {
     [CmdletBinding()]
@@ -420,30 +420,29 @@ function Write-CMakeBuild {
 }
 
 <#
- .Synopsis
- Runs the output of a CMake build.
+    .Synopsis
+    Runs the output of a CMake build.
 
- .Description
- `Invoke-CMakeOutput` runs the output of a CMake build. A {preset,configuration,target} can be specified, and `Invoke-CMakeOutput`
- will build the target, use the CMake code-model to discover the path to the generated executable and run it, passing any
- extra parameter specified. If `Invoke-CMakeOutput` is run from a folder that only contains a single executable target,
- then that target will be built and run.
+    .Description
+    `Invoke-CMakeOutput` runs the output of a CMake build. A {preset,configuration,target} can be specified, and `Invoke-CMakeOutput`
+    will build the target, use the CMake code-model to discover the path to the generated executable and run it, passing any
+    extra parameter specified. If `Invoke-CMakeOutput` is run from a folder that only contains a single executable target,
+    then that target will be built and run.
 
- .Parameter Preset
- The CMake preset to use. If none is specified, then the first valid preset from CMakePresets.json is used.
+    .Parameter Preset
+    The CMake preset to use. If none is specified, then the first valid preset from CMakePresets.json is used.
 
- .Parameter Configuration
- The CMake configuration to use. If none is specified, then the first valid configuration is used.
+    .Parameter Configuration
+    The CMake configuration to use. If none is specified, then the first valid configuration is used.
 
- .Parameter Target
- The CMake target that produces an executable to run.
+    .Parameter Target
+    The CMake target that produces an executable to run.
 
- .Parameter SkipBuild
- If specified, the build will be skipped, otherwise a build will be run before invoking the output.
+    .Parameter SkipBuild
+    If specified, the build will be skipped, otherwise a build will be run before invoking the output.
 
- .Parameter Arguments
- All other parameters will be passed to the discovered executable.
-
+    .Parameter Arguments
+    All other parameters will be passed to the discovered executable.
 #>
 function Invoke-CMakeOutput {
     [CmdletBinding(PositionalBinding = $false)]

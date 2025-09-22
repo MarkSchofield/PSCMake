@@ -30,11 +30,11 @@ $ErrorActionPreference = 'Stop'
 . $PSScriptRoot/Console.ps1
 
 <#
- .Synopsis
-  Tries to parse the specified Ninja log.
+    .Synopsis
+    Tries to parse the specified Ninja log.
 
- .Outputs
- The entries from the Ninja log.
+    .Outputs
+    The entries from the Ninja log.
 #>
 function TryParseNinjaLog {
     [CmdletBinding()]
@@ -63,11 +63,11 @@ function TryParseNinjaLog {
 $FileTimeOffset = [long]12622770400 * [long]10000000
 
 <#
- .Synopsis
-  Converts the specified Ninja log time representation into a [datetime].
+    .Synopsis
+    Converts the specified Ninja log time representation into a [datetime].
 
- .Notes
- This function is currently Windows-only.
+    .Notes
+    This function is currently Windows-only.
 #>
 function ConvertFrom-NinjaTime {
     param(
@@ -77,11 +77,11 @@ function ConvertFrom-NinjaTime {
 }
 
 <#
- .Synopsis
-  Converts the specified [datetime] into Ninja log time representation.
+    .Synopsis
+    Converts the specified [datetime] into Ninja log time representation.
 
- .Notes
- This function is currently Windows-only.
+    .Notes
+    This function is currently Windows-only.
 #>
 function ConvertTo-NinjaTime {
     param(
