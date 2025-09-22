@@ -364,14 +364,16 @@ function Build-CMakeBuild {
             #  2) '-fresh' was specified
             #  3) "$BinaryDirectory/CMakeCache.txt" doesn't exist
             #  4) The "Get-CMakeBuildCodeModelDirectory" folder doesn't exist
+            #  5) "Get-CMakeBuildCodeModel" returns $null
             if ($Configure -or
                 $Fresh -or
                 (-not (Test-Path -Path $CMakeCacheFile -PathType Leaf)) -or
-                (-not (Test-Path -Path (Get-CMakeBuildCodeModelDirectory $BinaryDirectory) -PathType Container))) {
+                (-not (Test-Path -Path (Get-CMakeBuildCodeModelDirectory $BinaryDirectory) -PathType Container)) -or
+                (-not ($CodeModel = Get-CMakeBuildCodeModel $BinaryDirectory))
+                ) {
                 ConfigureCMake -CMake $CMake $CMakePresetsJson $ConfigurePreset -Fresh:$Fresh
+                $CodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
             }
-
-            $CodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
 
             [string[]] $ConfigurationNames = @($null)
             if ($Configuration) {
