@@ -1,7 +1,7 @@
 #----------------------------------------------------------------------------------------------------------------------
 # MIT License
 #
-# Copyright (c) 2021 Mark Schofield
+# Copyright (c) 2025 Mark Schofield
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -38,8 +38,8 @@ $CMakeCandidates = @(
 )
 
 <#
- .Synopsis
-  Finds the root of the CMake build - the current or ancestral folder containing a 'CMakePresets.json' file.
+    .Synopsis
+    Finds the root of the CMake build - the current or ancestral folder containing a 'CMakePresets.json' file.
 #>
 function FindCMakeRoot {
     $CurrentLocation = (Get-Location).Path
@@ -49,16 +49,16 @@ function FindCMakeRoot {
 $script:CMakePresetsPath = $null
 
 <#
- .Synopsis
-  Gets the path that the most recently loaded CMakePresets.json was loaded from.
+    .Synopsis
+    Gets the path that the most recently loaded CMakePresets.json was loaded from.
 #>
 function GetCMakePresetsPath {
     $script:CMakePresetsPath
 }
 
 <#
- .Synopsis
-  Loads the CMakePresets.json into a PowerShell representation.
+    .Synopsis
+    Loads the CMakePresets.json into a PowerShell representation.
 #>
 function GetCMakePresets {
     param(
@@ -77,8 +77,8 @@ function GetCMakePresets {
 }
 
 <#
- .Synopsis
-  Gets names of the 'buildPresets' in the specified CMakePresets.json object.
+    .Synopsis
+    Gets names of the 'buildPresets' in the specified CMakePresets.json object.
 #>
 function GetBuildPresetNames {
     param(
@@ -106,8 +106,8 @@ function GetBuildPresetNames {
 }
 
 <#
- .Synopsis
-  Gets names of the 'configurePresets' in the specified CMakePresets.json object.
+    .Synopsis
+    Gets names of the 'configurePresets' in the specified CMakePresets.json object.
 #>
 function GetConfigurePresetNames {
     param(
@@ -127,16 +127,16 @@ function GetConfigurePresetNames {
 }
 
 <#
- .Synopsis
-  Finds the 'CMake' command.
+    .Synopsis
+    Finds the 'CMake' command.
 #>
 function GetCMake {
-    $CMake = Get-Variable -Name 'CMake' -ValueOnly -Scope global -ErrorAction SilentlyContinue
+    $CMake = Get-Variable -Name 'CMake' -ValueOnly -Scope script -ErrorAction SilentlyContinue
     if (-not $CMake) {
         foreach ($CMakeCandidate in $CMakeCandidates) {
             $CMake = Get-Command $CMakeCandidate -ErrorAction SilentlyContinue
             if ($CMake) {
-                $global:CMake = $CMake
+                $script:CMake = $CMake
                 break
             }
         }
@@ -280,7 +280,7 @@ function GetBinaryDirectory {
         $CMakePresetsJson,
         $ConfigurePreset
     )
-    $BinaryDirectory = ResolvePresetProperty $CMakePresetsJson $ConfigurePreset 'binaryDir'
+    $BinaryDirectory = ResolvePresetProperty -CMakePresetsJson $CMakePresetsJson $ConfigurePreset 'binaryDir'
 
     # Perform macro-replacement
     $Result = MacroReplacement $BinaryDirectory $ConfigurePreset
@@ -412,11 +412,11 @@ function Get-CMakeBuildCodeModelDirectory {
 }
 
 <#
- .Synopsis
-  Gets PowerShell representation of the CodeModel JSON for the given binary directory.
+    .Synopsis
+    Gets PowerShell representation of the CodeModel JSON for the given binary directory.
 
- .Outputs
-  The PowerShell representation of the CodeModel JSON for the given binary directory, or `$null` if it can't be found.
+    .Outputs
+    The PowerShell representation of the CodeModel JSON for the given binary directory, or `$null` if it can't be found.
 #>
 function Get-CMakeBuildCodeModel {
     param(
@@ -429,11 +429,11 @@ function Get-CMakeBuildCodeModel {
 }
 
 <#
- .Synopsis
-  Gets the target with the given name, for the given configuration from the specified code model.
+    .Synopsis
+    Gets the target with the given name, for the given configuration from the specified code model.
 
- .Outputs
-  The PowerShell representation of the target from the CodeModel JSON.
+    .Outputs
+    The PowerShell representation of the target from the CodeModel JSON.
 #>
 function GetNamedTarget {
     param(
@@ -453,11 +453,11 @@ function GetNamedTarget {
 }
 
 <#
- .Synopsis
-  Gets all targets within the given folder scope, for the given configuration from the specified code model.
+    .Synopsis
+    Gets all targets within the given folder scope, for the given configuration from the specified code model.
 
- .Outputs
-  The PowerShell representation of the target(s) from the CodeModel JSON.
+    .Outputs
+    The PowerShell representation of the target(s) from the CodeModel JSON.
 #>
 function GetScopedTargets {
     param(

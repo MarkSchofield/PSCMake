@@ -3,6 +3,6 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-function Get-CommandCompletions([string] $InputScript) {
+function Get-CommandCompletion([string] $InputScript) {
     [System.Management.Automation.CommandCompletion]::CompleteInput($InputScript, $InputScript.Length, $null)
 }

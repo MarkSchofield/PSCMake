@@ -1,7 +1,7 @@
 #----------------------------------------------------------------------------------------------------------------------
 # MIT License
 #
-# Copyright (c) 2021 Mark Schofield
+# Copyright (c) 2025 Mark Schofield
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -37,8 +37,8 @@ function Get-MemberValue {
 }
 
 <#
- .Synopsis
-  Performs linear interpolation from the first color to the second.
+    .Synopsis
+    Performs linear interpolation from the first color to the second.
 #>
 function ColorInterpolation {
     param(
@@ -56,8 +56,8 @@ function ColorInterpolation {
 }
 
 <#
- .Synopsis
-  Checks whether the given file is newer than any subsequently specified files.
+    .Synopsis
+    Checks whether the given file is newer than any subsequently specified files.
 #>
 function IsUpToDate($Target) {
     $Dependencies = $args
@@ -96,8 +96,8 @@ function DownloadFile([string] $Url, [string] $DownloadPath) {
 }
 
 <#
- .Synopsis
-  Searches the given location and parent folders looking for the given file.
+    .Synopsis
+    Searches the given location and parent folders looking for the given file.
 #>
 function GetPathOfFileAbove([string]$Location, [string]$File) {
     for (; $Location.Length -ne 0; $Location = Split-Path $Location) {
@@ -109,8 +109,8 @@ function GetPathOfFileAbove([string]$Location, [string]$File) {
 }
 
 <#
- .Synopsis
-  Converts named items on a Pipeline into a hash table.
+    .Synopsis
+    Converts named items on a Pipeline into a hash table.
 #>
 filter ToHashTable {
     begin { $Result = @{} }
