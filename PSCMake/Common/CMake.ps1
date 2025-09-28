@@ -133,10 +133,12 @@ function GetConfigurePresetNames {
         $Presets = $CMakePresetsJson.configurePresets
 
         # Filter presets that have '"hidden":true'
-        $Presets = $Presets | Where-Object { -not (Get-MemberValue -InputObject $_ -Name 'hidden' -Or $false) }
+        $Presets = $Presets |
+            Where-Object { -not (Get-MemberValue -InputObject $_ -Name 'hidden' -Or $false) }
 
         # Filter presets that have (or their ancestors have) conditions that evaluate to $false
-        $Presets = $Presets | Where-Object { EvaluatePresetCondition $_ $CMakePresetsJson.configurePresets }
+        $Presets = $Presets |
+            Where-Object { EvaluatePresetCondition $_ $CMakePresetsJson.configurePresets }
 
         $Presets.name
     }
@@ -185,48 +187,64 @@ function ResolvePresets {
     $PresetJson, $ConfigurePresetJson
 }
 
-function ResolvePresetProperty {
+<#
+    .Synopsis
+    Searches the specified preset and its ancestors, invoking the specified action for each preset.
+
+    .Parameter Preset
+    The preset to start searching from.
+
+    .Parameter Presets
+    The collection of presets to search for 'inherit' references.
+
+    .Description
+    The action should return $null to continue searching, or a non-$null value to stop searching and return that value.
+#>
+function SearchAncestors {
     param(
-        $CMakePresetsJson,
-        $ConfigurePreset,
-        $PropertyName
+        $Preset,
+        $Presets,
+        [scriptblock] $Action
     )
-
-    for ($Preset = $ConfigurePreset; $Preset; ) {
-        $PropertyValue = Get-MemberValue -InputObject $Preset -Name $PropertyName
-        if ($PropertyValue) {
-            return $PropertyValue
+    for (; $Preset; ) {
+        $Result = & $Action $Preset
+        if ($null -ne $Result) {
+            return $Result
         }
-
         $BasePreset = Get-MemberValue $Preset 'inherits'
         if (-not $BasePreset) {
             break
         }
+        $Preset = $Presets | Where-Object { $_.name -eq $BasePreset } | Select-Object -First 1
+    }
+}
 
-        $Preset = $CMakePresetsJson.configurePresets | Where-Object { $_.name -eq $BasePreset } | Select-Object -First 1
+function ResolvePresetProperty {
+    param(
+        $Preset,
+        $Presets,
+        $PropertyName
+    )
+    SearchAncestors $Preset $Presets {
+        param($CurrentPreset)
+        Get-MemberValue -InputObject $CurrentPreset -Name $PropertyName
     }
 }
 
 function EvaluatePresetCondition {
     param(
-        $PresetJson,
-        $PresetsJson
+        $Preset,
+        $Presets
     )
-
-    $PresetConditionJson = Get-MemberValue $PresetJson 'condition'
-    if ($PresetConditionJson) {
-        if (-not (EvaluateCondition $PresetConditionJson $PresetJson)) {
+    $Result = SearchAncestors $Preset $Presets {
+        param($CurrentPreset)
+        $PresetConditionJson = Get-MemberValue $CurrentPreset 'condition'
+        if (($PresetConditionJson) -and
+            (-not (EvaluateCondition $PresetConditionJson $CurrentPreset))) {
             return $false
         }
     }
-
-    $BasePresetName = Get-MemberValue $PresetJson 'inherits'
-    if (-not $BasePresetName) {
-        return $true
-    }
-
-    $BasePreset = $PresetsJson | Where-Object { $_.name -eq $BasePresetName } | Select-Object -First 1
-    EvaluatePresetCondition $BasePreset $PresetsJson
+    $Result -ne $false
 }
 
 function EvaluateCondition {
@@ -296,7 +314,7 @@ function GetBinaryDirectory {
         $CMakePresetsJson,
         $ConfigurePreset
     )
-    $BinaryDirectory = ResolvePresetProperty -CMakePresetsJson $CMakePresetsJson $ConfigurePreset 'binaryDir'
+    $BinaryDirectory = ResolvePresetProperty $ConfigurePreset $CMakePresetsJson.configurePresets  'binaryDir'
 
     # Perform macro-replacement
     $Result = MacroReplacement $BinaryDirectory $ConfigurePreset
