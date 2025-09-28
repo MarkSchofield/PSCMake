@@ -199,6 +199,8 @@ function ResolvePresets {
 
     .Description
     The action should return $null to continue searching, or a non-$null value to stop searching and return that value.
+
+    When searching multiple preset 'inherit' values, the presets will be search in order.
 #>
 function SearchAncestors {
     param(
@@ -206,16 +208,22 @@ function SearchAncestors {
         $Presets,
         [scriptblock] $Action
     )
-    for (; $Preset; ) {
+    if ($null -eq $Preset) {
+        return $null
+    }
+    [array] $PendingPresets = @($Preset)
+    for (; ($null -ne $PendingPresets) -and ($PendingPresets.Count -gt 0); ) {
+        $Preset, $PendingPresets = $PendingPresets
         $Result = & $Action $Preset
         if ($null -ne $Result) {
             return $Result
         }
-        $BasePreset = Get-MemberValue $Preset 'inherits'
-        if (-not $BasePreset) {
-            break
-        }
-        $Preset = $Presets | Where-Object { $_.name -eq $BasePreset } | Select-Object -First 1
+        [array] $BasePresets = Get-MemberValue $Preset 'inherits' -Or @() |
+            ForEach-Object {
+                $BaseParentName = $_
+                $Presets | Where-Object { $_.name -eq $BaseParentName } | Select-Object -First 1
+            }
+        $PendingPresets = $BasePresets + $PendingPresets
     }
 }
 
