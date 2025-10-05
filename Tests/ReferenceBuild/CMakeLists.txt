@@ -16,3 +16,6 @@ add_library(B_Library
 add_library(C_Library
     Reference.cpp
 )
+
+add_subdirectory(SubDirectory)
+add_subdirectory(SubDirectoryOther)
