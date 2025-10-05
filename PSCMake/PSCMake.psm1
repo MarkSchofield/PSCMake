@@ -251,7 +251,8 @@ function Configure-CMakeBuild {
         $ConfigurePresetNames | Select-Object -First 1
     } else {
         foreach ($CandidatePreset in $Preset) {
-            $ConfigurePresetNames | Where-Object { ($_ -eq $CandidatePreset) -or ($_ -like $CandidatePreset) }
+            $ExpandedPresets = $ConfigurePresetNames | Where-Object { $_ -like $CandidatePreset }
+            $ExpandedPresets ?? $CandidatePreset
         }
     }
 
@@ -340,7 +341,8 @@ function Build-CMakeBuild {
         $BuildPresetNames | Select-Object -First 1
     } else {
         foreach ($CandidatePreset in $Preset) {
-            $BuildPresetNames | Where-Object { ($_ -eq $CandidatePreset) -or ($_ -like $CandidatePreset) }
+            $ExpandedPresets = $BuildPresetNames | Where-Object { $_ -like $CandidatePreset }
+            $ExpandedPresets ?? $CandidatePreset
         }
     }
 
@@ -378,7 +380,8 @@ function Build-CMakeBuild {
             [string[]] $ConfigurationNames = @($null)
             if ($Configuration) {
                 $ConfigurationNames = foreach ($CandidateConfigurationName in $Configuration) {
-                    $CodeModel.configurations.name | Where-Object { ($_ -eq $CandidateConfigurationName) -or ($_ -like $CandidateConfigurationName) }
+                    $ExpandedName = $CodeModel.configurations.name | Where-Object { $_ -like $CandidateConfigurationName }
+                    $ExpandedName ?? $CandidateConfigurationName
                 }
             }
 
