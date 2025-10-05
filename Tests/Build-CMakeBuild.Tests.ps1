@@ -39,6 +39,53 @@ Describe 'Build-CMakeBuild' {
         $script:CMakeCalls[0] | Should -Be @('--build', '--preset', 'windows-x64')
     }
 
+    It 'Builds with a single preset' {
+        Using-Location "$PSScriptRoot/ReferenceBuild" {
+            Build-CMakeBuild -Preset windows-x64
+        }
+
+        $script:CMakeCalls | Should -HaveCount 1
+        $script:CMakeCalls[0] | Should -Be @('--build', '--preset', 'windows-x64')
+    }
+
+    It 'Builds a specified target' {
+        Using-Location "$PSScriptRoot/ReferenceBuild" {
+            Build-CMakeBuild -Preset windows-x64 -Target B_Library
+        }
+
+        $script:CMakeCalls | Should -HaveCount 1
+        $script:CMakeCalls[0] | Should -Be @('--build', '--preset', 'windows-x64', '--target', 'B_Library')
+    }
+
+    It 'Builds a multiple targets' {
+        Using-Location "$PSScriptRoot/ReferenceBuild" {
+            Build-CMakeBuild -Preset windows-x64 -Target A_Library,B_Library
+        }
+
+        $script:CMakeCalls | Should -HaveCount 1
+        $script:CMakeCalls[0] | Should -Be @('--build', '--preset', 'windows-x64', '--target', 'A_Library', 'B_Library')
+    }
+
+    It 'Reruns configuration with -Configure' {
+        Using-Location "$PSScriptRoot/ReferenceBuild" {
+            Build-CMakeBuild -Preset windows-x64 -Configure
+        }
+
+        $script:CMakeCalls | Should -HaveCount 2
+        $script:CMakeCalls[0] | Should -Be @('--preset', 'windows-x64')
+        $script:CMakeCalls[1] | Should -Be @('--build', '--preset', 'windows-x64')
+    }
+
+    It 'Reruns configuration with -Fresh' {
+        Using-Location "$PSScriptRoot/ReferenceBuild" {
+            Build-CMakeBuild -Preset windows-x64 -Fresh
+        }
+
+        $script:CMakeCalls | Should -HaveCount 2
+        $script:CMakeCalls[0] | Should -Be @('--preset', 'windows-x64', '--fresh')
+        $script:CMakeCalls[1] | Should -Be @('--build', '--preset', 'windows-x64')
+    }
+
     It 'Builds with wildcard presets' {
         Using-Location "$PSScriptRoot/ReferenceBuild" {
             Build-CMakeBuild -Preset '*-x64'
@@ -57,5 +104,14 @@ Describe 'Build-CMakeBuild' {
         $script:CMakeCalls[0] | Should -Be @('--build', '--preset', 'windows-x64', '--config', 'Debug')
         $script:CMakeCalls[1] | Should -Be @('--build', '--preset', 'windows-x64', '--config', 'Release')
         $script:CMakeCalls[2] | Should -Be @('--build', '--preset', 'windows-x64', '--config', 'RelWithDebInfo')
+    }
+
+    It 'Builds scoped targets' {
+        Using-Location "$PSScriptRoot/ReferenceBuild/SubDirectory" {
+            Build-CMakeBuild -Preset 'windows-x64'
+        }
+
+        $CMakeCalls | Should -HaveCount 1
+        $script:CMakeCalls[0] | Should -Be @('--build', '--preset', 'windows-x64', '--target', 'SubDirectory_Executable', 'SubDirectory_Library')
     }
 }
