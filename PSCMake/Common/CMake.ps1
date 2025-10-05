@@ -507,6 +507,10 @@ function GetScopedTargets {
         $Configuration,
         $ScopeLocation
     )
+    function CanonicalizeDirectoryPath($Path) {
+        Resolve-Path -Path (Join-Path -Path $Path -ChildPath '/')
+    }
+    $ScopeLocation = CanonicalizeDirectoryPath $ScopeLocation
     $CodeModelConfiguration = if ($Configuration) {
         $CodeModel.configurations | Where-Object { $_.name -eq $Configuration }
     } else {
@@ -521,7 +525,8 @@ function GetScopedTargets {
             } else {
                 Join-Path -Path $SourceDir -ChildPath $Folder
             }
-            $Folder.StartsWith($ScopeLocation)
+            $Folder = CanonicalizeDirectoryPath $Folder
+            $Folder.Path.StartsWith($ScopeLocation.Path)
         }
 }
 
