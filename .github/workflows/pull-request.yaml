@@ -15,19 +15,7 @@ jobs:
       - name: Invoke-Pester
         shell: pwsh
         run: |
-          Import-Module Pester
-          $Configuration = [PesterConfiguration]@{
-            Run = @{
-              Path = '*'
-              Passthru = $true
-            }
-            CodeCoverage = @{
-              Enabled = $true
-              OutputFormat = 'JaCoCo'
-              OutputPath = '${{ github.workspace }}/Pester-Coverage.xml'
-            }
-          }
-          Invoke-Pester -Configuration $Configuration
+          ${{ github.workspace }}/Build/RunTests.ps1
       - name: Build
         shell: pwsh
         run: |

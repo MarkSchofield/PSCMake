@@ -1,4 +1,5 @@
 {
+  "coverage-gutters.coverageBaseDir": "__output",
   "editor.renderWhitespace": "all",
   "powershell.codeFormatting.newLineAfterCloseBrace": false,
   "powershell.codeFormatting.pipelineIndentationStyle": "IncreaseIndentationForFirstPipeline",

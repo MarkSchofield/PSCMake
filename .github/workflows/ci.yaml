@@ -24,22 +24,10 @@ jobs:
       - name: Invoke-Pester
         shell: pwsh
         run: |
-          Import-Module Pester
-          $Configuration = [PesterConfiguration]@{
-            Run = @{
-              Path = '*'
-              Passthru = $true
-            }
-            CodeCoverage = @{
-              Enabled = $true
-              OutputFormat = 'JaCoCo'
-              OutputPath = '${{ github.workspace }}/Pester-Coverage.xml'
-            }
-          }
-          Invoke-Pester -Configuration $Configuration
+          ${{ github.workspace }}/Build/RunTests.ps1
       - uses: codecov/codecov-action@v5
         with:
-          files: '${{ github.workspace }}/Pester-Coverage.xml'
+          files: '${{ github.workspace }}/__output/coverage.xml'
           flags: unittests
           name: codecov-umbrella
           token: '${{ secrets.CODECOV_TOKEN }}'
