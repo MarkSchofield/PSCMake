@@ -21,6 +21,7 @@ BeforeAll {
             [string] $CMakePath,
             [string[]] $Arguments
         )
+        $null = $CMakePath
         $script:CMakeCalls += , $Arguments
     }
 }

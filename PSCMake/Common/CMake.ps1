@@ -217,7 +217,7 @@ function ResolvePresetProperty {
         $Presets,
         $PropertyName
     )
-    SearchAncestors $Preset $Presets {
+    SearchAncestors -Preset $Preset -Presets $Presets {
         param($CurrentPreset)
         Get-MemberValue -InputObject $CurrentPreset -Name $PropertyName
     }
@@ -228,7 +228,7 @@ function EvaluatePresetCondition {
         $Preset,
         $Presets
     )
-    $Result = SearchAncestors $Preset $Presets {
+    $Result = SearchAncestors -Preset $Preset -Presets $Presets {
         param($CurrentPreset)
         $PresetConditionJson = Get-MemberValue $CurrentPreset 'condition'
         if (($PresetConditionJson) -and
@@ -306,7 +306,7 @@ function GetBinaryDirectory {
         $CMakePresetsJson,
         $ConfigurePreset
     )
-    $BinaryDirectory = ResolvePresetProperty $ConfigurePreset $CMakePresetsJson.configurePresets  'binaryDir'
+    $BinaryDirectory = ResolvePresetProperty -Preset $ConfigurePreset -Presets $CMakePresetsJson.configurePresets -PropertyName 'binaryDir'
 
     # Perform macro-replacement
     $Result = MacroReplacement $BinaryDirectory $ConfigurePreset
