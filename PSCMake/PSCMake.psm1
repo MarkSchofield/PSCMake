@@ -32,6 +32,22 @@ $ErrorActionPreference = 'Stop'
 
 <#
     .Synopsis
+    Invokes an executable.
+
+    .Description
+    A function wrapping calls to '&', allowing the calls to be mocked for testing.
+#>
+function InvokeExecutable {
+    param(
+        [string] $Path,
+        [string[]] $Arguments
+    )
+    Write-Verbose "Invoking: $Path $Arguments"
+    & $Path @Arguments
+}
+
+<#
+    .Synopsis
     An argument-completer for `Build-CMakeBuild`'s `-Preset` parameter.
 #>
 function BuildPresetsCompleter {
@@ -210,7 +226,7 @@ function ConfigureCMake {
         }
     )
 
-    InvokeCMake $CMake $CMakeArguments
+    InvokeExecutable $CMake $CMakeArguments
     if ($LASTEXITCODE -ne 0) {
         Write-Error "Configuration failed. Command line: '$($CMake.Source)' $($CMakeArguments -join ' ')"
     }
@@ -410,7 +426,7 @@ function Build-CMakeBuild {
                 )
 
                 $StartTime = [datetime]::Now
-                InvokeCMake $CMake $CMakeArguments
+                InvokeExecutable $CMake $CMakeArguments
                 if ($LASTEXITCODE -ne 0) {
                     Write-Error "Build failed. Command line: '$($CMake.Source)' $($CMakeArguments -join ' ')"
                 }
