@@ -145,7 +145,7 @@ function BuildTargetsCompleter {
 
 <#
     .Synopsis
-    An argument-completer for `Build-CMakeBuild`'s `-Targets` parameter.
+    An argument-completer for `Invoke-CMakeOutput`'s `-Target` parameter.
 #>
 function ExecutableTargetsCompleter {
     param(
