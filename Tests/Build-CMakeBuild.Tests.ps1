@@ -16,7 +16,7 @@ BeforeAll {
 
     # Mock subsequent calls to invoke CMake so that we don't actually try to build anything.
     $script:CMakeCalls = @()
-    Mock -ModuleName PSCMake InvokeCMake {
+    Mock -ModuleName PSCMake InvokeExecutable {
         param(
             [string] $CMakePath,
             [string[]] $Arguments

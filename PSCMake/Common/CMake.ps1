@@ -39,22 +39,6 @@ $CMakeCandidates = @(
 
 <#
     .Synopsis
-    Invokes CMake.
-
-    .Description
-    A function wrapping calls to CMake, allowing the calls to be mocked for testing.
-#>
-function InvokeCMake {
-    param(
-        [string] $CMakePath,
-        [string[]] $Arguments
-    )
-    Write-Verbose "CMake Arguments: $Arguments"
-    & $CMakePath @Arguments
-}
-
-<#
-    .Synopsis
     Finds the root of the CMake build - the current or ancestral folder containing a 'CMakePresets.json' file.
 #>
 function FindCMakeRoot {

@@ -15,11 +15,12 @@ BeforeAll {
     Import-Module -Force $PSScriptRoot/../PSCMake/PSCMake.psd1 -DisableNameChecking
 
     # Mock subsequent calls to invoke CMake so that we don't actually try to build anything.
-    Mock -ModuleName PSCMake InvokeCMake {
+    Mock -ModuleName PSCMake InvokeExecutable {
         param(
             [string] $CMakePath,
             [string[]] $Arguments
         )
+        $null = $CMakePath
         $script:CMakeCalls += , $Arguments
     }
 }
