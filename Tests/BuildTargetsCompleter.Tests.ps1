@@ -20,7 +20,7 @@ Describe 'BuildTargetsCompleter' {
         Using-Location "$PSScriptRoot/ReferenceBuild" {
             $Completions = Get-CommandCompletion "Build-CMakeBuild -Targets "
 
-            $Completions.CompletionMatches.Count | Should -Be 10
+            $Completions.CompletionMatches | Should -HaveCount 10
             $Completions.CompletionMatches.CompletionText | Should -Be @(
                 'A_Library'
                 'B_Library'
