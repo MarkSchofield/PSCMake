@@ -48,5 +48,6 @@ function GetReferenceBuildProperties() {
     [PSCustomObject]@{
         BinaryDirectory = $BinaryDirectory
         CodeModelFile = Get-CMakeBuildCodeModel $BinaryDirectory
+        SourceDirectory = (Resolve-Path -Path "$PSScriptRoot/ReferenceBuild/").Path
     }
 }
