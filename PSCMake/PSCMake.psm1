@@ -579,7 +579,7 @@ function Invoke-CMakeOutput {
 
     Write-Output "Running: $TargetPath $Arguments"
     Write-Output '----'
-    & $TargetPath @Arguments
+    InvokeExecutable $TargetPath $Arguments
 }
 
 Register-ArgumentCompleter -CommandName Invoke-CMakeOutput -ParameterName Preset -ScriptBlock $function:BuildPresetsCompleter
