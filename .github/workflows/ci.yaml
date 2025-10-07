@@ -14,32 +14,23 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    environment:
+      name: General
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - name: Invoke-Pester
         shell: pwsh
         run: |
-          Import-Module Pester
-          $Configuration = [PesterConfiguration]@{
-            Run = @{
-              Path = '*'
-              Passthru = $true
-            }
-            CodeCoverage = @{
-              Enabled = $true
-              OutputFormat = 'JaCoCo'
-              OutputPath = '${{ env.GITHUB_WORKSPACE }}/Pester-Coverage.xml'
-            }
-          }
-          Invoke-Pester -Configuration $Configuration
-      - uses: codecov/codecov-action@v3
+          ${{ github.workspace }}/Build/RunTests.ps1
+      - uses: codecov/codecov-action@v5
         with:
-          files: '${{ env.GITHUB_WORKSPACE }}/Pester-Coverage.xml'
+          files: '${{ github.workspace }}/__output/coverage.xml'
           flags: unittests
           name: codecov-umbrella
+          token: '${{ secrets.CODECOV_TOKEN }}'
           fail_ci_if_error: true
           verbose: true
       - name: Build
@@ -47,7 +38,7 @@ jobs:
         run: |
           & .\Build\Publish.ps1 -Verbose
       - name: Upload __packages
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: __packages
           path: __packages
@@ -59,7 +50,7 @@ jobs:
     steps:
       - name: Download __packages
         id: download
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v5
         with:
           name: __packages
           path: __packages

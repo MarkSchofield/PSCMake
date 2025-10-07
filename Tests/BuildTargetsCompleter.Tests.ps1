@@ -18,12 +18,21 @@ BeforeAll {
 Describe 'BuildTargetsCompleter' {
     It 'Returns the targets of the default preset, default configuration when neither is specified' {
         Using-Location "$PSScriptRoot/ReferenceBuild" {
-            $Completions = Get-CommandCompletions "Build-CMakeBuild -Targets "
+            $Completions = Get-CommandCompletion "Build-CMakeBuild -Targets "
 
-            $Completions.CompletionMatches.Count | Should -Be 3
-            $Completions.CompletionMatches[0].CompletionText | Should -Be 'A_Library'
-            $Completions.CompletionMatches[1].CompletionText | Should -Be 'B_Library'
-            $Completions.CompletionMatches[2].CompletionText | Should -Be 'C_Library'
+            $Completions.CompletionMatches | Should -HaveCount 10
+            $Completions.CompletionMatches.CompletionText | Should -Be @(
+                'A_Library'
+                'B_Library'
+                'C_Library'
+                'SubDirectoryOther_Executable'
+                'SubDirectoryOther_Library'
+                'SubDirectory_Executable'
+                'SubDirectory_Library'
+                'all'
+                'clean'
+                'install'
+            )
         }
     }
 }

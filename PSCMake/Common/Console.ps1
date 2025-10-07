@@ -1,7 +1,7 @@
 #----------------------------------------------------------------------------------------------------------------------
 # MIT License
 #
-# Copyright (c) 2021 Mark Schofield
+# Copyright (c) 2025 Mark Schofield
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -74,11 +74,11 @@ function GetConsole {
 }
 
 <#
- .Synopsis
-  Returns whether virtual terminal processing is enabled for the current console.
+    .Synopsis
+    Returns whether virtual terminal processing is enabled for the current console.
 
- .Outputs
- `$true` if virtual terminal processing is enabled, `$false` otherwise.
+    .Outputs
+    `$true` if virtual terminal processing is enabled, `$false` otherwise.
 #>
 function IsVirtualTerminalProcessingEnabled {
     if ($null -eq $script:IsVirtualTerminalProcessingEnabled) {
@@ -101,10 +101,10 @@ function IsVirtualTerminalProcessingEnabled {
 }
 
 <#
- .Synopsis
-  Returns the control codes to set the foreground color to the specified value.
+    .Synopsis
+    Returns the control codes to set the foreground color to the specified value.
 #>
-function ColorToControlCode{
+function ColorToControlCode {
     param(
         [System.Drawing.Color]$Color
     )
@@ -114,10 +114,10 @@ function ColorToControlCode{
 }
 
 <#
- .Synopsis
-  Returns the control codes to reset foreground attributes, if virtual terminal processing is enable.
+    .Synopsis
+    Returns the control codes to reset foreground attributes, if virtual terminal processing is enable.
 #>
-function ResetForegroundControlCode{
+function ResetForegroundControlCode {
     if (IsVirtualTerminalProcessingEnabled) {
         "`e[39m"
     }

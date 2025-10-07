@@ -11,8 +11,8 @@ BeforeAll {
 
 Describe 'BuildConfigurationsCompleter' {
     It 'Returns the default configurations when no preset is specified' {
-        $Completions = Get-CommandCompletions "Build-CMakeBuild -Configurations "
-        $Completions.CompletionMatches.Count | Should -Be 4
+        $Completions = Get-CommandCompletion "Build-CMakeBuild -Configuration "
+        $Completions.CompletionMatches | Should -HaveCount 4
         $Completions.CompletionMatches[0].CompletionText | Should -Be 'Release'
         $Completions.CompletionMatches[1].CompletionText | Should -Be 'Debug'
         $Completions.CompletionMatches[2].CompletionText | Should -Be 'RelWithDebInfo'
@@ -20,8 +20,8 @@ Describe 'BuildConfigurationsCompleter' {
     }
 
     It 'Returns the default configurations when no preset is specified, filtered by the word to complete' {
-        $Completions = Get-CommandCompletions "Build-CMakeBuild -Configurations D"
-        $Completions.CompletionMatches.Count | Should -Be 1
+        $Completions = Get-CommandCompletion "Build-CMakeBuild -Configuration D"
+        $Completions.CompletionMatches | Should -HaveCount 1
         $Completions.CompletionMatches[0].CompletionText | Should -Be 'Debug'
     }
 }

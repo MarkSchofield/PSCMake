@@ -9,7 +9,7 @@ Describe 'ResolvePresetProperty' {
         $CMakePresetsJson = Get-Content "$PSScriptRoot/ReferencePresets/CMakePresets.Single.json" | ConvertFrom-Json
         $ConfigurePreset = $CMakePresetsJson.configurePresets[0]
 
-        $BinaryDirectory = ResolvePresetProperty $CMakePresetsJson $ConfigurePreset 'binaryDir'
+        $BinaryDirectory = ResolvePresetProperty $ConfigurePreset $CMakePresetsJson.configurePresets 'binaryDir'
         $BinaryDirectory | Should -Be '${sourceDir}/__output/${presetName}'
     }
 
@@ -17,7 +17,7 @@ Describe 'ResolvePresetProperty' {
         $CMakePresetsJson = Get-Content "$PSScriptRoot/ReferencePresets/CMakePresets.Inherited.json" | ConvertFrom-Json
         $ConfigurePreset = $CMakePresetsJson.configurePresets | Where-Object { $_.name -eq 'windows-x64' } | Select-Object -First 1
 
-        $BinaryDirectory = ResolvePresetProperty $CMakePresetsJson $ConfigurePreset 'binaryDir'
+        $BinaryDirectory = ResolvePresetProperty $ConfigurePreset $CMakePresetsJson.configurePresets 'binaryDir'
         $BinaryDirectory | Should -Be '${sourceDir}/__output/${presetName}'
     }
 }

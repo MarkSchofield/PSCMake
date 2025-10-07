@@ -6,15 +6,15 @@ BeforeAll {
     $env:PSCMAKE_ENV_TEST = 43
 
     Mock GetMacroConstants { @{
-        '${hostSystemName}'='Linux'
-        '$vendor{PSCMake}'='true'
-    } }
+            '${hostSystemName}' = 'Linux'
+            '$vendor{PSCMake}'  = 'true'
+        } }
 
     Mock GetCMakePresetsPath {
         'C:\chunky\bacon\CMakePresets.json'
     }
 
-    $PresetJson = ConvertFrom-Json -InputObject @'
+    $script:PresetJson = ConvertFrom-Json -InputObject @'
     {
         "name": "windows-x64",
         "configurePreset": "windows-x64"
