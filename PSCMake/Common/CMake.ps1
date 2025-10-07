@@ -448,7 +448,12 @@ function Get-CMakeBuildCodeModel {
     param(
         [string] $BinaryDirectory
     )
-    Get-ChildItem -Path (Get-CMakeBuildCodeModelDirectory $BinaryDirectory) -File -Filter 'codemodel-v2-*' -ErrorAction SilentlyContinue |
+
+    # Since BinaryDirectory may contain characters that are valid for the file-system, but are used by PowerShell's
+    # wildcard syntax (i.e. '[' and ']'), escape the characters before passing to Get-ChildItem.
+    $EscapedBinaryDirectory = $BinaryDirectory.Replace('[', '`[').Replace(']', '`]')
+
+    Get-ChildItem -Path (Get-CMakeBuildCodeModelDirectory $EscapedBinaryDirectory) -File -Filter 'codemodel-v2-*' -ErrorAction SilentlyContinue |
         Select-Object -First 1 |
         Get-Content |
         ConvertFrom-Json
