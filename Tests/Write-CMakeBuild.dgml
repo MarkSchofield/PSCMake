@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<DirectedGraph xmlns="http://schemas.microsoft.com/vs/2009/dgml">
+<Properties>
+<Property Id="Definition" Label="Definition" DataType="System.String" IsReference="True" />
+<Property Id="Type" DataType="System.String" />
+</Properties>
+<Styles>
+<Style TargetType="Node" GroupLabel="Executable" ValueLabel="Executable">
+<Condition Expression="Type='EXECUTABLE'" />
+<Setter Property="Background" Value="#FF0000" />
+</Style>
+</Styles>
+<Nodes>
+<Node
+  Id="A_Library::@6890427a1f51a3e7e1df"
+  Label="A_Library"
+  Type="STATIC_LIBRARY"
+  Definition="CMakeLists.txt"
+/>
+<Node
+  Id="Debug/A_Library.lib"
+/>
+<Node
+  Id="B_Library::@6890427a1f51a3e7e1df"
+  Label="B_Library"
+  Type="STATIC_LIBRARY"
+  Definition="CMakeLists.txt"
+/>
+<Node
+  Id="Debug/B_Library.lib"
+/>
+<Node
+  Id="C_Library::@6890427a1f51a3e7e1df"
+  Label="C_Library"
+  Type="STATIC_LIBRARY"
+  Definition="CMakeLists.txt"
+/>
+<Node
+  Id="Debug/C_Library.lib"
+/>
+<Node
+  Id="SubDirectoryOther_Executable::@01210d55993b56455dd6"
+  Label="SubDirectoryOther_Executable"
+  Type="EXECUTABLE"
+  Definition="SubDirectoryOther\CMakeLists.txt"
+/>
+<Node
+  Id="SubDirectoryOther/Debug/SubDirectoryOther_Executable.exe"
+/>
+<Node
+  Id="SubDirectoryOther/Debug/SubDirectoryOther_Executable.pdb"
+/>
+<Node
+  Id="SubDirectoryOther_Library::@01210d55993b56455dd6"
+  Label="SubDirectoryOther_Library"
+  Type="STATIC_LIBRARY"
+  Definition="SubDirectoryOther\CMakeLists.txt"
+/>
+<Node
+  Id="SubDirectoryOther/Debug/SubDirectoryOther_Library.lib"
+/>
+<Node
+  Id="SubDirectory_Executable::@c68b9f6dab07fa391196"
+  Label="SubDirectory_Executable"
+  Type="EXECUTABLE"
+  Definition="SubDirectory\CMakeLists.txt"
+/>
+<Node
+  Id="SubDirectory/Debug/SubDirectory_Executable.exe"
+/>
+<Node
+  Id="SubDirectory/Debug/SubDirectory_Executable.pdb"
+/>
+<Node
+  Id="SubDirectory_Library::@c68b9f6dab07fa391196"
+  Label="SubDirectory_Library"
+  Type="STATIC_LIBRARY"
+  Definition="SubDirectory\CMakeLists.txt"
+/>
+<Node
+  Id="SubDirectory/Debug/SubDirectory_Library.lib"
+/>
+</Nodes>
+<Links>
+<Link
+  Source="SubDirectory_Executable::@c68b9f6dab07fa391196"
+  Target="SubDirectory/Debug/SubDirectory_Executable.exe"
+/>
+<Link
+  Source="SubDirectory_Executable::@c68b9f6dab07fa391196"
+  Target="SubDirectory/Debug/SubDirectory_Executable.pdb"
+/>
+<Link
+  Source="B_Library::@6890427a1f51a3e7e1df"
+  Target="Debug/B_Library.lib"
+/>
+<Link
+  Source="SubDirectory_Library::@c68b9f6dab07fa391196"
+  Target="SubDirectory/Debug/SubDirectory_Library.lib"
+/>
+<Link
+  Source="SubDirectoryOther_Library::@01210d55993b56455dd6"
+  Target="SubDirectoryOther/Debug/SubDirectoryOther_Library.lib"
+/>
+<Link
+  Source="A_Library::@6890427a1f51a3e7e1df"
+  Target="Debug/A_Library.lib"
+/>
+<Link
+  Source="C_Library::@6890427a1f51a3e7e1df"
+  Target="Debug/C_Library.lib"
+/>
+<Link
+  Source="SubDirectoryOther_Executable::@01210d55993b56455dd6"
+  Target="SubDirectoryOther/Debug/SubDirectoryOther_Executable.exe"
+/>
+<Link
+  Source="SubDirectoryOther_Executable::@01210d55993b56455dd6"
+  Target="SubDirectoryOther/Debug/SubDirectoryOther_Executable.pdb"
+/>
+</Links>
+</DirectedGraph>

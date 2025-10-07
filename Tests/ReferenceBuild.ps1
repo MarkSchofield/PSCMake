@@ -41,3 +41,13 @@ function PrepareReferenceBuild() {
         "-DCMAKE_MAKE_PROGRAM=$CMAKE_MAKE_PROGRAM"
     )
 }
+
+function GetReferenceBuildProperties() {
+    $BinaryDirectory = "$PSScriptRoot/ReferenceBuild/__output/windows-x64"
+
+    [PSCustomObject]@{
+        BinaryDirectory = $BinaryDirectory
+        CodeModelFile = Get-CMakeBuildCodeModel $BinaryDirectory
+        SourceDirectory = (Resolve-Path -Path "$PSScriptRoot/ReferenceBuild/").Path
+    }
+}

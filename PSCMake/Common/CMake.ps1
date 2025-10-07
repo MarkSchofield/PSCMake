@@ -1,7 +1,7 @@
 #----------------------------------------------------------------------------------------------------------------------
 # MIT License
 #
-# Copyright (c) 2021 Mark Schofield
+# Copyright (c) 2025 Mark Schofield
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -30,7 +30,6 @@ $ErrorActionPreference = 'Stop'
 
 $PEnv = Get-ChildItem env: | ToHashTable
 
-$PreviousLocation = $null
 $CMakeCandidates = @(
     (Get-Command 'cmake' -ErrorAction SilentlyContinue)
     if ($IsWindows) {
@@ -39,33 +38,27 @@ $CMakeCandidates = @(
 )
 
 <#
- .Synopsis
-  Finds the root of the CMake build - the current or ancestral folder containing a 'CMakePresets.json' file.
+    .Synopsis
+    Finds the root of the CMake build - the current or ancestral folder containing a 'CMakePresets.json' file.
 #>
 function FindCMakeRoot {
     $CurrentLocation = (Get-Location).Path
-    if ($CurrentLocation -ne $script:PreviousLocation) {
-        Write-Verbose "PreviousLocation = $script:PreviousLocation"
-        Write-Verbose "CurrentLocation = $CurrentLocation"
-        $script:PreviousLocation = $CurrentLocation
-        $script:CMakeRoot = GetPathOfFileAbove $CurrentLocation 'CMakePresets.json'
-    }
-    $script:CMakeRoot
+    GetPathOfFileAbove $CurrentLocation 'CMakePresets.json'
 }
 
 $script:CMakePresetsPath = $null
 
 <#
- .Synopsis
-  Gets the path that the most recently loaded CMakePresets.json was loaded from.
+    .Synopsis
+    Gets the path that the most recently loaded CMakePresets.json was loaded from.
 #>
 function GetCMakePresetsPath {
     $script:CMakePresetsPath
 }
 
 <#
- .Synopsis
-  Loads the CMakePresets.json into a PowerShell representation.
+    .Synopsis
+    Loads the CMakePresets.json into a PowerShell representation.
 #>
 function GetCMakePresets {
     param(
@@ -84,8 +77,8 @@ function GetCMakePresets {
 }
 
 <#
- .Synopsis
-  Gets names of the 'buildPresets' in the specified CMakePresets.json object.
+    .Synopsis
+    Gets names of the 'buildPresets' in the specified CMakePresets.json object.
 #>
 function GetBuildPresetNames {
     param(
@@ -103,18 +96,18 @@ function GetBuildPresetNames {
         # Filter presets that have configure presets that have conditions that evaluate to $false
         $Presets = $Presets | Where-Object {
             $BuildPresetJson = $_
-            $ConfigurePresetJson = $CMakePresetsJson.configurePresets |
-                Where-Object { $_.name -eq $BuildPresetJson.configurePreset } |
-                Where-Object { EvaluatePresetCondition $_ $CMakePresetsJson.configurePresets }
+            $ConfigurePresetJson = $CMakePresetsJson.configurePresets | Where-Object { $_.name -eq $BuildPresetJson.configurePreset } | Where-Object { EvaluatePresetCondition $_ $CMakePresetsJson.configurePresets }
+
             $null -ne $ConfigurePresetJson
         }
+
         $Presets.name
     }
 }
 
 <#
- .Synopsis
-  Gets names of the 'configurePresets' in the specified CMakePresets.json object.
+    .Synopsis
+    Gets names of the 'configurePresets' in the specified CMakePresets.json object.
 #>
 function GetConfigurePresetNames {
     param(
@@ -124,26 +117,28 @@ function GetConfigurePresetNames {
         $Presets = $CMakePresetsJson.configurePresets
 
         # Filter presets that have '"hidden":true'
-        $Presets = $Presets | Where-Object { -not (Get-MemberValue -InputObject $_ -Name 'hidden' -Or $false) }
+        $Presets = $Presets |
+            Where-Object { -not (Get-MemberValue -InputObject $_ -Name 'hidden' -Or $false) }
 
         # Filter presets that have (or their ancestors have) conditions that evaluate to $false
-        $Presets = $Presets | Where-Object { EvaluatePresetCondition $_ $CMakePresetsJson.configurePresets }
+        $Presets = $Presets |
+            Where-Object { EvaluatePresetCondition $_ $CMakePresetsJson.configurePresets }
 
         $Presets.name
     }
 }
 
 <#
- .Synopsis
-  Finds the 'CMake' command.
+    .Synopsis
+    Finds the 'CMake' command.
 #>
 function GetCMake {
-    $CMake = Get-Variable -Name 'CMake' -ValueOnly -Scope global -ErrorAction SilentlyContinue
+    $CMake = Get-Variable -Name 'CMake' -ValueOnly -Scope script -ErrorAction SilentlyContinue
     if (-not $CMake) {
         foreach ($CMakeCandidate in $CMakeCandidates) {
             $CMake = Get-Command $CMakeCandidate -ErrorAction SilentlyContinue
             if ($CMake) {
-                $global:CMake = $CMake
+                $script:CMake = $CMake
                 break
             }
         }
@@ -176,48 +171,72 @@ function ResolvePresets {
     $PresetJson, $ConfigurePresetJson
 }
 
+<#
+    .Synopsis
+    Searches the specified preset and its ancestors, invoking the specified action for each preset.
+
+    .Parameter Preset
+    The preset to start searching from.
+
+    .Parameter Presets
+    The collection of presets to search for 'inherit' references.
+
+    .Description
+    The action should return $null to continue searching, or a non-$null value to stop searching and return that value.
+
+    When searching multiple preset 'inherit' values, the presets will be search in order.
+#>
+function SearchAncestors {
+    param(
+        $Preset,
+        $Presets,
+        [scriptblock] $Action
+    )
+    if ($null -eq $Preset) {
+        return $null
+    }
+    [array] $PendingPresets = @($Preset)
+    for (; ($null -ne $PendingPresets) -and ($PendingPresets.Count -gt 0); ) {
+        $Preset, $PendingPresets = $PendingPresets
+        $Result = & $Action $Preset
+        if ($null -ne $Result) {
+            return $Result
+        }
+        [array] $BasePresets = Get-MemberValue $Preset 'inherits' -Or @() |
+            ForEach-Object {
+                $BaseParentName = $_
+                $Presets | Where-Object { $_.name -eq $BaseParentName } | Select-Object -First 1
+            }
+        $PendingPresets = $BasePresets + $PendingPresets
+    }
+}
+
 function ResolvePresetProperty {
     param(
-        $CMakePresetsJson,
-        $ConfigurePreset,
+        $Preset,
+        $Presets,
         $PropertyName
     )
-
-    for ($Preset = $ConfigurePreset; $Preset; ) {
-        $PropertyValue = Get-MemberValue -InputObject $Preset -Name $PropertyName
-        if ($PropertyValue) {
-            return $PropertyValue
-        }
-
-        $BasePreset = Get-MemberValue $Preset 'inherits'
-        if (-not $BasePreset) {
-            break
-        }
-
-        $Preset = $CMakePresetsJson.configurePresets | Where-Object { $_.name -eq $BasePreset } | Select-Object -First 1
+    SearchAncestors -Preset $Preset -Presets $Presets {
+        param($CurrentPreset)
+        Get-MemberValue -InputObject $CurrentPreset -Name $PropertyName
     }
 }
 
 function EvaluatePresetCondition {
     param(
-        $PresetJson,
-        $PresetsJson
+        $Preset,
+        $Presets
     )
-
-    $PresetConditionJson = Get-MemberValue $PresetJson 'condition'
-    if ($PresetConditionJson) {
-        if (-not (EvaluateCondition $PresetConditionJson $PresetJson)) {
+    $Result = SearchAncestors -Preset $Preset -Presets $Presets {
+        param($CurrentPreset)
+        $PresetConditionJson = Get-MemberValue $CurrentPreset 'condition'
+        if (($PresetConditionJson) -and
+            (-not (EvaluateCondition $PresetConditionJson $CurrentPreset))) {
             return $false
         }
     }
-
-    $BasePresetName = Get-MemberValue $PresetJson 'inherits'
-    if (-not $BasePresetName) {
-        return $true
-    }
-
-    $BasePreset = $PresetsJson | Where-Object { $_.name -eq $BasePresetName } | Select-Object -First 1
-    EvaluatePresetCondition $BasePreset $PresetsJson
+    $Result -ne $false
 }
 
 function EvaluateCondition {
@@ -225,8 +244,7 @@ function EvaluateCondition {
         $ConditionJson,
         $PresetJson
     )
-    switch ($ConditionJson.type)
-    {
+    switch ($ConditionJson.type) {
         'equals' {
             return (MacroReplacement $ConditionJson.lhs $PresetJson) -eq (MacroReplacement $ConditionJson.rhs $PresetJson)
         }
@@ -288,7 +306,7 @@ function GetBinaryDirectory {
         $CMakePresetsJson,
         $ConfigurePreset
     )
-    $BinaryDirectory = ResolvePresetProperty $CMakePresetsJson $ConfigurePreset 'binaryDir'
+    $BinaryDirectory = ResolvePresetProperty -Preset $ConfigurePreset -Presets $CMakePresetsJson.configurePresets -PropertyName 'binaryDir'
 
     # Perform macro-replacement
     $Result = MacroReplacement $BinaryDirectory $ConfigurePreset
@@ -309,8 +327,8 @@ function GetMacroConstants {
     }
 
     @{
-        '${hostSystemName}'=$HostSystemName
-        '$vendor{PSCMake}'='true'
+        '${hostSystemName}' = $HostSystemName
+        '$vendor{PSCMake}'  = 'true'
     }
 }
 
@@ -391,6 +409,27 @@ function Enable-CMakeBuildQuery {
         }
 }
 
+# For the 'code model' JSON that was found, load the full 'target' JSON to be able to find 'EXECUTABLE' targets.
+#
+function FilterExecutableTargets {
+    param (
+        $CodeModelDirectory,
+        $TargetTuplesCodeModel
+    )
+    $TargetJsons = $TargetTuplesCodeModel |
+        ForEach-Object {
+            Join-Path -Path $CodeModelDirectory -ChildPath $_.jsonFile |
+                Get-Item |
+                Get-Content |
+                ConvertFrom-Json
+            }
+
+    $TargetJsons |
+        Where-Object {
+            $_.type -eq 'EXECUTABLE'
+        }
+}
+
 function Get-CMakeBuildCodeModelDirectory {
     param(
         [string] $BinaryDirectory
@@ -399,28 +438,33 @@ function Get-CMakeBuildCodeModelDirectory {
 }
 
 <#
- .Synopsis
-  Gets PowerShell representation of the CodeModel JSON for the given binary directory.
+    .Synopsis
+    Gets PowerShell representation of the CodeModel JSON for the given binary directory.
 
- .Outputs
-  The PowerShell representation of the CodeModel JSON for the given binary directory, or `$null` if it can't be found.
+    .Outputs
+    The PowerShell representation of the CodeModel JSON for the given binary directory, or `$null` if it can't be found.
 #>
 function Get-CMakeBuildCodeModel {
     param(
         [string] $BinaryDirectory
     )
-    Get-ChildItem -Path (Get-CMakeBuildCodeModelDirectory $BinaryDirectory) -File -Filter 'codemodel-v2-*' -ErrorAction SilentlyContinue |
+
+    # Since BinaryDirectory may contain characters that are valid for the file-system, but are used by PowerShell's
+    # wildcard syntax (i.e. '[' and ']'), escape the characters before passing to Get-ChildItem.
+    $EscapedBinaryDirectory = $BinaryDirectory.Replace('[', '`[').Replace(']', '`]')
+
+    Get-ChildItem -Path (Get-CMakeBuildCodeModelDirectory $EscapedBinaryDirectory) -File -Filter 'codemodel-v2-*' -ErrorAction SilentlyContinue |
         Select-Object -First 1 |
         Get-Content |
         ConvertFrom-Json
 }
 
 <#
- .Synopsis
-  Gets the target with the given name, for the given configuration from the specified code model.
+    .Synopsis
+    Gets the target with the given name, for the given configuration from the specified code model.
 
- .Outputs
-  The PowerShell representation of the target from the CodeModel JSON.
+    .Outputs
+    The PowerShell representation of the target from the CodeModel JSON.
 #>
 function GetNamedTarget {
     param(
@@ -440,11 +484,11 @@ function GetNamedTarget {
 }
 
 <#
- .Synopsis
-  Gets all targets within the given folder scope, for the given configuration from the specified code model.
+    .Synopsis
+    Gets all targets within the given folder scope, for the given configuration from the specified code model.
 
- .Outputs
-  The PowerShell representation of the target(s) from the CodeModel JSON.
+    .Outputs
+    The PowerShell representation of the target(s) from the CodeModel JSON.
 #>
 function GetScopedTargets {
     param(
@@ -452,20 +496,26 @@ function GetScopedTargets {
         $Configuration,
         $ScopeLocation
     )
+    function CanonicalizeDirectoryPath($Path) {
+        Resolve-Path -Path (Join-Path -Path $Path -ChildPath '/')
+    }
+    $ScopeLocation = CanonicalizeDirectoryPath $ScopeLocation
     $CodeModelConfiguration = if ($Configuration) {
         $CodeModel.configurations | Where-Object { $_.name -eq $Configuration }
     } else {
         $CodeModel.configurations[0]
     }
+    $SourceDir = $CodeModel.paths.source
     $CodeModelConfiguration.targets |
         Where-Object {
             $Folder = $CodeModelConfiguration.directories[$_.directoryIndex].build
             $Folder = if ($Folder -eq '.') {
-                $CMakeRoot
+                $SourceDir
             } else {
-                Join-Path -Path $CMakeRoot -ChildPath $Folder
+                Join-Path -Path $SourceDir -ChildPath $Folder
             }
-            $Folder.StartsWith($ScopeLocation)
+            $Folder = CanonicalizeDirectoryPath $Folder
+            $Folder.Path.StartsWith($ScopeLocation.Path)
         }
 }
 
@@ -500,16 +550,32 @@ function WriteDgml {
     $Targets = @{}
     '<?xml version="1.0" encoding="utf-8"?>'
     '<DirectedGraph xmlns="http://schemas.microsoft.com/vs/2009/dgml">'
+        '<Properties>'
+            '<Property Id="Definition" Label="Definition" DataType="System.String" IsReference="True" />'
+            '<Property Id="Type" DataType="System.String" />'
+        '</Properties>'
+        '<Styles>'
+            '<Style TargetType="Node" GroupLabel="Executable" ValueLabel="Executable">'
+                '<Condition Expression="Type=''EXECUTABLE''" />'
+                '<Setter Property="Background" Value="#FF0000" />'
+            '</Style>'
+        '</Styles>'
+        $SourcePath = $CodeModel.paths.source
         '<Nodes>'
             ($CodeModel.configurations | Where-Object { $_.name -eq $Configuration }).targets |
                 ForEach-Object {
+                    $TargetJson = Get-Content (Join-Path -Path $CodeModelDirectory -ChildPath $_.jsonFile) |
+                        ConvertFrom-Json
+
+                    $ReferenceFileIndex = $TargetJson.backtraceGraph.nodes[0].file
+                    $Definition = Join-Path -Path $SourcePath -ChildPath $TargetJson.backtraceGraph.files[$ReferenceFileIndex]
+
                     '<Node'
                         "  Id=`"$($_.id)`""
                         "  Label=`"$($_.name)`""
+                        "  Type=`"$($TargetJson.type)`""
+                        "  Definition=`"$($Definition)`""
                         '/>'
-
-                    $TargetJson = Get-Content (Join-Path -Path $CodeModelDirectory -ChildPath $_.jsonFile) |
-                        ConvertFrom-Json
 
                     Get-MemberValue -InputObject $TargetJson -Name artifacts -Or @() |
                         ForEach-Object {

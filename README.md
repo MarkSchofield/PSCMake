@@ -5,11 +5,11 @@ provide a declaration - through a JSON file - of the available builds, where the
 sorts of useful metadata that makes it easier to build standard tooling around the build. This PowerShell module is one
 attempt at such tooling.
 
-The PSCMake PowerShell module supports;
+The PSCMake PowerShell module supports:
 
-    1. configuring and building a CMake build,
-    2. generating a 'DGML'- or 'DOT'- file for a build,
-    3. invoking executable CMake build outputs.
+1. configuring and building a CMake build,
+2. generating a 'DGML'- or 'DOT'- file for a build,
+3. invoking executable CMake build outputs.
 
 By leveraging the CMake file API, the module is able to offer tab-completion for presets, configurations and targets, and can implicitly scope the build based on the current working directory.
 
@@ -37,7 +37,7 @@ The module provides the following commands:
 3. `Write-CMakeBuild` - To output the CMake build as a DOT or DGML graph.
 4. `Invoke-CMakeOutput` - To run an executable output from a CMake build, by target name or implicitly by scope.
 
-Running `Build-CMakeBuild` by itself would run the first `buildConfiguration`. Run either command with `-?` to get more
+Running `Build-CMakeBuild` by itself would run the first `buildConfiguration`. Run any command with `-?` to get more
 details.
 
 [cmake-presets]: <https://cmake.org/cmake/help/latest/manual/cmake-presets.7.html> "CMake Presets"
