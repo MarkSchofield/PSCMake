@@ -258,4 +258,19 @@ Describe 'EvaluateCondition' {
 
         EvaluateCondition $NotCondition $PresetJson | Should -Be $false
     }
+
+    It 'Resolves $env{} macros from generatorEnvironment before the process environment' {
+        $PresetJson = [PSCustomObject]@{
+            generatorEnvironment = @{ MY_GEN_VAR = 'from-generator' }
+        }
+        $Condition = @'
+        {
+            "type": "equals",
+            "lhs": "$env{MY_GEN_VAR}",
+            "rhs": "from-generator"
+        }
+'@ | ConvertFrom-Json
+
+        EvaluateCondition $Condition $PresetJson | Should -Be $true
+    }
 }

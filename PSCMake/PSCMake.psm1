@@ -41,10 +41,22 @@ $ErrorActionPreference = 'Stop'
 function InvokeExecutable {
     param(
         [string] $Path,
-        [string[]] $Arguments
+        [string[]] $Arguments,
+        [hashtable] $Environment = @{}
     )
-    Write-Verbose "Invoking: $Path $Arguments"
-    & $Path @Arguments
+    $Saved = @{}
+    foreach ($Key in $Environment.Keys) {
+        $Saved[$Key] = [System.Environment]::GetEnvironmentVariable($Key)
+        [System.Environment]::SetEnvironmentVariable($Key, $Environment[$Key])
+    }
+    try {
+        Write-Verbose "Invoking: $Path $Arguments"
+        & $Path @Arguments
+    } finally {
+        foreach ($Key in $Saved.Keys) {
+            [System.Environment]::SetEnvironmentVariable($Key, $Saved[$Key])
+        }
+    }
 }
 
 <#
@@ -237,7 +249,8 @@ function ConfigureCMake {
         $Arguments
     )
 
-    InvokeExecutable $CMake $CMakeArguments
+    $GeneratorEnvironment = Get-MemberValue $ConfigurePreset 'generatorEnvironment' -Or @{}
+    InvokeExecutable $CMake $CMakeArguments -Environment $GeneratorEnvironment
     if ($LASTEXITCODE -ne 0) {
         Write-Error "Configuration failed. Command line: '$($CMake.Source)' $($CMakeArguments -join ' ')"
     }

@@ -27,6 +27,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 . $PSScriptRoot/Common.ps1
+. $PSScriptRoot/VisualStudio.ps1
 
 $PEnv = Get-ChildItem env: | ToHashTable
 
@@ -205,6 +206,38 @@ function GetConfigurePresets {
     )
     if ($CMakePresetsJson) {
         $Presets = $CMakePresetsJson.configurePresets
+
+        # For each configurePreset identify if an external 'generator environment' can be identified.
+        foreach ($Preset in $Presets) {
+            $Architecture = Get-MemberValue $Preset 'architecture'
+            $Toolset      = Get-MemberValue $Preset 'toolset'
+
+            $ArchitectureStrategy = Get-MemberValue $Architecture 'strategy'
+            $ToolsetStrategy      = Get-MemberValue $Toolset      'strategy'
+
+            if (($ArchitectureStrategy -ne 'external') -and ($ToolsetStrategy -ne 'external')) {
+                continue
+            }
+
+            $ArchitectureValue      = Get-MemberValue $Architecture 'value'
+            $ArchitectureProperties = if ($ArchitectureValue) { ParseArchitectureValue $ArchitectureValue } else { @{} }
+
+            $ToolsetValue      = Get-MemberValue $Toolset 'value'
+            $ToolsetProperties = if ($ToolsetValue) { ParseArchitectureValue $ToolsetValue } else { @{} }
+
+            $VSEnvironmentArgs = @{}
+            $ArchPlatform = $ArchitectureProperties['platform']
+            $ArchVersion  = $ArchitectureProperties['version']
+            $ToolsetName  = $ToolsetProperties['platform']
+            $ToolsetVer   = $ToolsetProperties['version']
+
+            if ($ArchPlatform) { $VSEnvironmentArgs['Architecture']      = $ArchPlatform }
+            if ($ArchVersion)  { $VSEnvironmentArgs['WindowsSdkVersion'] = $ArchVersion }
+            if ($ToolsetName)  { $VSEnvironmentArgs['Toolset']           = $ToolsetName }
+            if ($ToolsetVer)   { $VSEnvironmentArgs['ToolsetVersion']    = $ToolsetVer }
+
+            $Preset | Add-Member -NotePropertyName 'generatorEnvironment' -NotePropertyValue (Get-VSEnvironment @VSEnvironmentArgs) -Force
+        }
 
         # Filter presets that have '"hidden":true'
         $Presets = $Presets |
@@ -494,7 +527,9 @@ function MacroReplacement {
                 break
             }
             '\$env\{([^\}]*)\}' {
-                [System.Environment]::GetEnvironmentVariable($Matches[1])
+                $VarName = $Matches[1]
+                $GenEnv = Get-MemberValue $PresetJson 'generatorEnvironment' -Or @{}
+                $GenEnv[$VarName] ?? [System.Environment]::GetEnvironmentVariable($VarName)
             }
             '\$penv\{([^\}]*)\}' {
                 $PEnv[$Matches[1]]
