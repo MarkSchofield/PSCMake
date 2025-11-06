@@ -197,7 +197,9 @@ function ConfigurePresetsCompleter {
     $null = $CommandAst
     $null = $FakeBoundParameters
     $CMakePresetsJson = GetCMakePresets -Silent
-    GetConfigurePresetNames $CMakePresetsJson | Where-Object { $_ -ilike "$WordToComplete*" }
+    GetConfigurePresets $CMakePresetsJson |
+        Select-Object -ExpandProperty 'name' |
+        Where-Object { $_ -ilike "$WordToComplete*" }
 }
 
 function ConfigureCMake {
@@ -262,25 +264,24 @@ function Configure-CMakeBuild {
     )
     $CMakeRoot = FindCMakeRoot
     $CMakePresetsJson = GetCMakePresets
-    $ConfigurePresetNames = GetConfigurePresetNames $CMakePresetsJson
-    $ConfigurePresetNames = if (-not $Preset) {
-        $ConfigurePresetNames | Select-Object -First 1
+    $ConfigurePresets = GetConfigurePresets $CMakePresetsJson
+    $ConfigurePresets = if (-not $Preset) {
+        $ConfigurePresets | Select-Object -First 1
     } else {
-        foreach ($CandidatePreset in $Preset) {
-            $ExpandedPresets = $ConfigurePresetNames | Where-Object { $_ -like $CandidatePreset }
-            $ExpandedPresets ?? $CandidatePreset
+        foreach ($CandidatePresetName in $Preset) {
+            $MatchingPresets = $ConfigurePresets |
+                Where-Object { ($_.name -like $CandidatePresetName) -or ($_.name -eq $CandidatePresetName) }
+            if (-not $MatchingPresets) {
+                Write-Error "Unable to find configuration preset '$CandidatePresetName' in $script:CMakePresetsPath"
+            }
+            $MatchingPresets
         }
     }
 
     $CMake = GetCMake
     Using-Location $CMakeRoot {
-        foreach ($ConfigurePresetName in $ConfigurePresetNames) {
-            Write-Output "Preset         : $ConfigurePresetName"
-
-            $ConfigurePreset = $CMakePresetsJson.configurePresets | Where-Object { $_.name -eq $ConfigurePresetName }
-            if (-not $ConfigurePreset) {
-                Write-Error "Unable to find configuration preset '$ConfigurePresetName' in $script:CMakePresetsPath"
-            }
+        foreach ($ConfigurePreset in $ConfigurePresets) {
+            Write-Output "Preset         : $($ConfigurePreset.name)"
 
             ConfigureCMake -CMake $CMake $CMakePresetsJson $ConfigurePreset -Fresh:$Fresh
         }

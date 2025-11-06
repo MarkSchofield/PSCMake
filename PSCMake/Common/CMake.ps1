@@ -107,9 +107,9 @@ function GetBuildPresetNames {
 
 <#
     .Synopsis
-    Gets names of the 'configurePresets' in the specified CMakePresets.json object.
+    Gets the 'configurePresets' in the specified CMakePresets.json object.
 #>
-function GetConfigurePresetNames {
+function GetConfigurePresets {
     param(
         $CMakePresetsJson
     )
@@ -124,7 +124,7 @@ function GetConfigurePresetNames {
         $Presets = $Presets |
             Where-Object { EvaluatePresetCondition $_ $CMakePresetsJson.configurePresets }
 
-        $Presets.name
+        $Presets
     }
 }
 
