@@ -78,9 +78,9 @@ function GetCMakePresets {
 
 <#
     .Synopsis
-    Gets names of the 'buildPresets' in the specified CMakePresets.json object.
+    Gets 'buildPresets' in the specified CMakePresets.json object.
 #>
-function GetBuildPresetNames {
+function GetBuildPresets {
     param(
         $CMakePresetsJson
     )
@@ -101,15 +101,38 @@ function GetBuildPresetNames {
             $null -ne $ConfigurePresetJson
         }
 
-        $Presets.name
+        $Presets
+    }
+}
+
+function GetMatchingBuildPresets {
+    param(
+        $CMakePresetsJson,
+        $Preset
+    )
+    $BuildPresets = GetBuildPresets $CMakePresetsJson
+    if (-not $Preset) {
+        if (-not $BuildPresets) {
+            Write-Error "No Presets values specified, and one could not be inferred."
+        }
+        $BuildPresets | Select-Object -First 1
+    } else {
+        foreach ($CandidatePresetName in $Preset) {
+            $MatchingPresets = $BuildPresets |
+                Where-Object { ($_.name -like $CandidatePresetName) -or ($_.name -eq $CandidatePresetName) }
+            if (-not $MatchingPresets) {
+                Write-Error "Unable to find build preset '$CandidatePresetName' in $script:CMakePresetsPath"
+            }
+            $MatchingPresets
+        }
     }
 }
 
 <#
     .Synopsis
-    Gets names of the 'configurePresets' in the specified CMakePresets.json object.
+    Gets the 'configurePresets' in the specified CMakePresets.json object.
 #>
-function GetConfigurePresetNames {
+function GetConfigurePresets {
     param(
         $CMakePresetsJson
     )
@@ -124,7 +147,7 @@ function GetConfigurePresetNames {
         $Presets = $Presets |
             Where-Object { EvaluatePresetCondition $_ $CMakePresetsJson.configurePresets }
 
-        $Presets.name
+        $Presets
     }
 }
 
@@ -149,26 +172,12 @@ function GetCMake {
     $CMake
 }
 
-function ResolvePresets {
+function GetConfigurePresetFor {
     param(
         $CMakePresetsJson,
-
-        [ValidateSet('buildPresets', 'testPresets')]
-        $PresetType,
-
-        $PresetName
+        $Preset
     )
-    $PresetJson = $CMakePresetsJson.$PresetType | Where-Object { $_.name -eq $PresetName }
-    if (-not $PresetJson) {
-        Write-Error "Unable to find $PresetType '$Preset' in $(GetCMakePresetsPath)"
-    }
-
-    $ConfigurePresetJson = $CMakePresetsJson.configurePresets | Where-Object { $_.name -eq $PresetJson.configurePreset }
-    if (-not $ConfigurePresetJson) {
-        Write-Error "Unable to find configure preset '$($PresetJson.configurePreset)' in $(GetCMakePresetsPath)"
-    }
-
-    $PresetJson, $ConfigurePresetJson
+    $CMakePresetsJson.configurePresets | Where-Object { $_.name -eq $Preset.configurePreset }
 }
 
 <#

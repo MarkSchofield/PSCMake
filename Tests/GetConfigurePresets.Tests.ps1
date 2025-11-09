@@ -9,11 +9,12 @@ BeforeAll {
         } }
 }
 
-Describe 'GetConfigurePresetNames' {
+Describe 'GetConfigurePresets' {
     It 'Given CMakePresets.Complex.json it retrieves the correct configuration preset names.' {
         $CMakePresetsJson = Get-Content "$PSScriptRoot/ReferencePresets/CMakePresets.Complex.json" | ConvertFrom-Json
 
-        GetConfigurePresetNames $CMakePresetsJson |
+        GetConfigurePresets $CMakePresetsJson |
+            Select-Object -ExpandProperty 'name' |
             Should -Be @('linux-x64')
     }
 }

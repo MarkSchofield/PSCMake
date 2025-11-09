@@ -63,7 +63,9 @@ function BuildPresetsCompleter {
     $null = $CommandAst
     $null = $FakeBoundParameters
     $CMakePresetsJson = GetCMakePresets -Silent
-    GetBuildPresetNames $CMakePresetsJson | Where-Object { $_ -ilike "$WordToComplete*" }
+    GetBuildPresets $CMakePresetsJson |
+        Select-Object -ExpandProperty 'name' |
+        Where-Object { $_ -ilike "$WordToComplete*" }
 }
 
 <#
@@ -112,10 +114,9 @@ function BuildTargetsCompleter {
     $null = $ParameterName
     $null = $CommandAst
     $CMakePresetsJson = GetCMakePresets -Silent
-    $PresetNames = GetBuildPresetNames $CMakePresetsJson
-    $PresetName = $FakeBoundParameters['Preset'] ?? $PresetNames |
+    $BuildPreset = GetMatchingBuildPresets $CMakePresetsJson $FakeBoundParameters['Preset'] |
         Select-Object -First 1
-    $BuildPreset, $ConfigurePreset = ResolvePresets $CMakePresetsJson 'buildPresets' $PresetName
+    $ConfigurePreset = GetConfigurePresetFor $CMakePresetsJson $BuildPreset
     $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
     $CMakeCodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
 
@@ -159,10 +160,9 @@ function ExecutableTargetsCompleter {
     $null = $ParameterName
     $null = $CommandAst
     $CMakePresetsJson = GetCMakePresets -Silent
-    $PresetNames = GetBuildPresetNames $CMakePresetsJson
-    $PresetName = $FakeBoundParameters['Presets'] ?? $PresetNames |
+    $BuildPreset = GetMatchingBuildPresets $CMakePresetsJson $FakeBoundParameters['Preset'] |
         Select-Object -First 1
-    $BuildPreset, $ConfigurePreset = ResolvePresets $CMakePresetsJson 'buildPresets' $PresetName
+    $ConfigurePreset = GetConfigurePresetFor $CMakePresetsJson $BuildPreset
     $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
     $CMakeCodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
 
@@ -197,7 +197,9 @@ function ConfigurePresetsCompleter {
     $null = $CommandAst
     $null = $FakeBoundParameters
     $CMakePresetsJson = GetCMakePresets -Silent
-    GetConfigurePresetNames $CMakePresetsJson | Where-Object { $_ -ilike "$WordToComplete*" }
+    GetConfigurePresets $CMakePresetsJson |
+        Select-Object -ExpandProperty 'name' |
+        Where-Object { $_ -ilike "$WordToComplete*" }
 }
 
 function ConfigureCMake {
@@ -262,25 +264,24 @@ function Configure-CMakeBuild {
     )
     $CMakeRoot = FindCMakeRoot
     $CMakePresetsJson = GetCMakePresets
-    $ConfigurePresetNames = GetConfigurePresetNames $CMakePresetsJson
-    $ConfigurePresetNames = if (-not $Preset) {
-        $ConfigurePresetNames | Select-Object -First 1
+    $ConfigurePresets = GetConfigurePresets $CMakePresetsJson
+    $ConfigurePresets = if (-not $Preset) {
+        $ConfigurePresets | Select-Object -First 1
     } else {
-        foreach ($CandidatePreset in $Preset) {
-            $ExpandedPresets = $ConfigurePresetNames | Where-Object { $_ -like $CandidatePreset }
-            $ExpandedPresets ?? $CandidatePreset
+        foreach ($CandidatePresetName in $Preset) {
+            $MatchingPresets = $ConfigurePresets |
+                Where-Object { ($_.name -like $CandidatePresetName) -or ($_.name -eq $CandidatePresetName) }
+            if (-not $MatchingPresets) {
+                Write-Error "Unable to find configuration preset '$CandidatePresetName' in $script:CMakePresetsPath"
+            }
+            $MatchingPresets
         }
     }
 
     $CMake = GetCMake
     Using-Location $CMakeRoot {
-        foreach ($ConfigurePresetName in $ConfigurePresetNames) {
-            Write-Output "Preset         : $ConfigurePresetName"
-
-            $ConfigurePreset = $CMakePresetsJson.configurePresets | Where-Object { $_.name -eq $ConfigurePresetName }
-            if (-not $ConfigurePreset) {
-                Write-Error "Unable to find configuration preset '$ConfigurePresetName' in $script:CMakePresetsPath"
-            }
+        foreach ($ConfigurePreset in $ConfigurePresets) {
+            Write-Output "Preset         : $($ConfigurePreset.name)"
 
             ConfigureCMake -CMake $CMake $CMakePresetsJson $ConfigurePreset -Fresh:$Fresh
         }
@@ -349,18 +350,7 @@ function Build-CMakeBuild {
     )
     $CMakeRoot = FindCMakeRoot
     $CMakePresetsJson = GetCMakePresets
-    $BuildPresetNames = GetBuildPresetNames $CMakePresetsJson
-    $BuildPresetNames = if (-not $Preset) {
-        if (-not $BuildPresetNames) {
-            Write-Error "No Presets values specified, and one could not be inferred."
-        }
-        $BuildPresetNames | Select-Object -First 1
-    } else {
-        foreach ($CandidatePreset in $Preset) {
-            $ExpandedPresets = $BuildPresetNames | Where-Object { $_ -like $CandidatePreset }
-            $ExpandedPresets ?? $CandidatePreset
-        }
-    }
+    $BuildPresets = GetMatchingBuildPresets $CMakePresetsJson $Preset
 
     # If;
     #   * no targets were specified, and
@@ -370,10 +360,10 @@ function Build-CMakeBuild {
     $ScopeLocation = (Get-Location).Path
     $CMake = GetCMake
     Using-Location $CMakeRoot {
-        foreach ($BuildPresetName in $BuildPresetNames) {
-            Write-Output "Preset         : $BuildPresetName"
+        foreach ($BuildPreset in $BuildPresets) {
+            Write-Output "Preset         : $($BuildPreset.name)"
 
-            $BuildPreset, $ConfigurePreset = ResolvePresets $CMakePresetsJson 'buildPresets' $BuildPresetName
+            $ConfigurePreset = GetConfigurePresetFor $CMakePresetsJson $BuildPreset
             $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
             $CMakeCacheFile = Join-Path -Path $BinaryDirectory -ChildPath 'CMakeCache.txt'
 
@@ -415,7 +405,7 @@ function Build-CMakeBuild {
 
                 $CMakeArguments = @(
                     '--build'
-                    '--preset', $BuildPresetName
+                    '--preset', $BuildPreset.name
                     if ($ConfigurationName) {
                         '--config', $ConfigurationName
                     }
@@ -451,17 +441,9 @@ function Write-CMakeBuild {
         [string] $As = 'dot'
     )
     $CMakePresetsJson = GetCMakePresets
-    $PresetNames = GetBuildPresetNames $CMakePresetsJson
-
-    if (-not $Preset) {
-        if (-not $PresetNames) {
-            Write-Error "No Preset values specified, and one could not be inferred."
-        }
-        $Preset = $PresetNames | Select-Object -First 1
-        Write-Information "No preset specified, defaulting to: $Preset"
-    }
-
-    $BuildPreset, $ConfigurePreset = ResolvePresets $CMakePresetsJson 'buildPresets' $Preset
+    $BuildPreset = GetMatchingBuildPresets $CMakePresetsJson $Preset |
+        Select-Object -First 1
+    $ConfigurePreset = GetConfigurePresetFor $CMakePresetsJson $BuildPreset
     $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
     $CodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
     $CodeModelDirectory = Get-CMakeBuildCodeModelDirectory $BinaryDirectory
@@ -521,16 +503,9 @@ function Invoke-CMakeOutput {
         [string[]] $Arguments
     )
     $CMakePresetsJson = GetCMakePresets
-    $PresetNames = GetBuildPresetNames $CMakePresetsJson
-
-    if (-not $Preset) {
-        if (-not $PresetNames) {
-            Write-Error "No Presets values specified, and one could not be inferred."
-        }
-        $Preset = $PresetNames | Select-Object -First 1
-    }
-
-    $BuildPreset, $ConfigurePreset = ResolvePresets $CMakePresetsJson 'buildPresets' $Preset
+    $BuildPreset = GetMatchingBuildPresets $CMakePresetsJson $Preset |
+        Select-Object -First 1
+    $ConfigurePreset = GetConfigurePresetFor $CMakePresetsJson $BuildPreset
     $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
 
     # Find the 'code model' for the preset. If no code model is found, configure the build and try again.
