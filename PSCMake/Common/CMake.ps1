@@ -418,8 +418,8 @@ function FilterExecutableTargets {
     )
     $TargetJsons = $TargetTuplesCodeModel |
         ForEach-Object {
-            Join-Path -Path $CodeModelDirectory -ChildPath $_.jsonFile |
-                Get-Item |
+            $JsonPath = Join-Path -Path $CodeModelDirectory -ChildPath $_.jsonFile
+            Get-Item -LiteralPath $JsonPath |
                 Get-Content |
                 ConvertFrom-Json
             }
@@ -450,10 +450,8 @@ function Get-CMakeBuildCodeModel {
     )
 
     # Since BinaryDirectory may contain characters that are valid for the file-system, but are used by PowerShell's
-    # wildcard syntax (i.e. '[' and ']'), escape the characters before passing to Get-ChildItem.
-    $EscapedBinaryDirectory = $BinaryDirectory.Replace('[', '`[').Replace(']', '`]')
-
-    Get-ChildItem -Path (Get-CMakeBuildCodeModelDirectory $EscapedBinaryDirectory) -File -Filter 'codemodel-v2-*' -ErrorAction SilentlyContinue |
+    # wildcard syntax (i.e. '[' and ']'), specify it as the LiteralPath to Get-ChildItem
+    Get-ChildItem -LiteralPath (Get-CMakeBuildCodeModelDirectory $BinaryDirectory) -File -Filter 'codemodel-v2-*' -ErrorAction SilentlyContinue |
         Select-Object -First 1 |
         Get-Content |
         ConvertFrom-Json

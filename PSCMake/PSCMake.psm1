@@ -385,8 +385,8 @@ function Build-CMakeBuild {
             #  5) "Get-CMakeBuildCodeModel" returns $null
             if ($Configure -or
                 $Fresh -or
-                (-not (Test-Path -Path $CMakeCacheFile -PathType Leaf)) -or
-                (-not (Test-Path -Path (Get-CMakeBuildCodeModelDirectory $BinaryDirectory) -PathType Container)) -or
+                (-not (Test-Path -LiteralPath $CMakeCacheFile -PathType Leaf)) -or
+                (-not (Test-Path -LiteralPath (Get-CMakeBuildCodeModelDirectory $BinaryDirectory) -PathType Container)) -or
                 (-not ($CodeModel = Get-CMakeBuildCodeModel $BinaryDirectory))
                 ) {
                 ConfigureCMake -CMake $CMake $CMakePresetsJson $ConfigurePreset -Fresh:$Fresh
