@@ -5,7 +5,8 @@
     "minor": 21,
     "patch": 0
   },
-  "configurePresets": [{
+  "configurePresets": [
+    {
       "name": "ninja",
       "hidden": true,
       "generator": "Ninja Multi-Config"
@@ -31,6 +32,13 @@
       "environment": {}
     },
     {
+      "name": "windows-x64[asan]",
+      "inherits": "windows-x64",
+      "cacheVariables": {
+        "ENABLE_ASAN": "ON"
+      }
+    },
+    {
       "name": "windows-arm",
       "inherits": "windows",
       "description": "windows-arm",
@@ -43,24 +51,31 @@
       "environment": {}
     }
   ],
-  "buildPresets": [{
+  "buildPresets": [
+    {
       "name": "windows-x64",
       "configurePreset": "windows-x64"
+    },
+    {
+      "name": "windows-x64[asan]",
+      "configurePreset": "windows-x64[asan]"
     },
     {
       "name": "windows-arm",
       "configurePreset": "windows-arm"
     }
   ],
-  "testPresets": [{
-    "name": "windows-x64",
-    "configurePreset": "windows-x64",
-    "output": {
-      "outputOnFailure": true
-    },
-    "execution": {
-      "noTestsAction": "error",
-      "stopOnFailure": true
+  "testPresets": [
+    {
+      "name": "windows-x64",
+      "configurePreset": "windows-x64",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error",
+        "stopOnFailure": true
+      }
     }
-  }]
+  ]
 }

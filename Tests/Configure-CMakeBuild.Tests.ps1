@@ -80,9 +80,10 @@ Describe 'Configure-CMakeBuild' {
         Using-Location "$PSScriptRoot/ReferenceBuild" {
             Configure-CMakeBuild -Preset windows-*
 
-            $script:CMakeCalls | Should -HaveCount 2
+            $script:CMakeCalls | Should -HaveCount 3
             $script:CMakeCalls[0] | Should -Be @('--preset', 'windows-x64')
-            $script:CMakeCalls[1] | Should -Be @('--preset', 'windows-arm')
+            $script:CMakeCalls[1] | Should -Be @('--preset', 'windows-x64[asan]')
+            $script:CMakeCalls[2] | Should -Be @('--preset', 'windows-arm')
         }
     }
 
