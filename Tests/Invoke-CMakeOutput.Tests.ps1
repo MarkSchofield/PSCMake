@@ -7,9 +7,11 @@ BeforeAll {
     . $PSScriptRoot/TestUtilities.ps1
     . $PSScriptRoot/ReferenceBuild.ps1
 
-    $Properties = PrepareReferenceBuild
-
     $CMake = "$env:ProgramFiles/CMake/bin/cmake.exe"
+    $Properties = PrepareReferenceBuild 'windows-x64'
+    & $CMake @Properties
+
+    $Properties = PrepareReferenceBuild 'windows-x64[asan]'
     & $CMake @Properties
 
     Import-Module -Force $PSScriptRoot/../PSCMake/PSCMake.psd1 -DisableNameChecking
@@ -70,6 +72,17 @@ Describe 'Invoke-CMakeOutput' {
             $script:ExecutableCalls[0].Arguments | Should -Be @('--build', '--preset', 'windows-x64', '--target', 'SubDirectory_Executable')
             $script:ExecutableCalls[1].Arguments | Should -BeNullOrEmpty
             $script:ExecutableCalls[1].Path | Should -Be @("$PSScriptRoot\ReferenceBuild\__output\windows-x64\SubDirectory\Debug\SubDirectory_Executable.exe")
+        }
+    }
+
+    It 'Runs an executable in a preset with [ and ]' {
+        Using-Location "$PSScriptRoot/ReferenceBuild/SubDirectory" {
+            Invoke-CMakeOutput -preset 'windows-x64[asan]'
+
+            $script:ExecutableCalls | Should -HaveCount 2
+            $script:ExecutableCalls[0].Arguments | Should -Be @('--build', '--preset', 'windows-x64[asan]', '--target', 'SubDirectory_Executable')
+            $script:ExecutableCalls[1].Arguments | Should -BeNullOrEmpty
+            $script:ExecutableCalls[1].Path | Should -Be @("$PSScriptRoot\ReferenceBuild\__output\windows-x64[asan]\SubDirectory\Debug\SubDirectory_Executable.exe")
         }
     }
 
