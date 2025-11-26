@@ -39,18 +39,28 @@ $CMakeCandidates = @(
 
 <#
     .Synopsis
-    Finds the root of the CMake build - the current or ancestral folder containing a 'CMakePresets.json' file.
+    Finds the path of the CMakePresets file in the current or ancestral folder. This may be a 'CMakePresets.json' file
+    or a 'CMakeUserPresets.json' file.
+#>
+function FindCMakePresets {
+    $CurrentLocation = (Get-Location).Path
+    GetPathOfFileAbove $CurrentLocation 'CMakeUserPresets.json', 'CMakePresets.json'
+}
+
+<#
+    .Synopsis
+    Finds the root of the CMake build - the current or ancestral folder containing CMake presets.
 #>
 function FindCMakeRoot {
-    $CurrentLocation = (Get-Location).Path
-    GetPathOfFileAbove $CurrentLocation 'CMakePresets.json'
+    $CMakePresetsPath = FindCMakePresets
+    [System.IO.Path]::GetDirectoryName($CMakePresetsPath)
 }
 
 $script:CMakePresetsPath = $null
 
 <#
     .Synopsis
-    Gets the path that the most recently loaded CMakePresets.json was loaded from.
+    Gets the path that the most recently loaded 'CMakePresets.json' or 'CMakeUserPresets.json' was loaded from.
 #>
 function GetCMakePresetsPath {
     $script:CMakePresetsPath
@@ -64,16 +74,62 @@ function GetCMakePresets {
     param(
         [switch] $Silent
     )
-    $CMakeRoot = FindCMakeRoot
-    if (-not $CMakeRoot) {
+    $script:CMakePresetsPath = FindCMakePresets
+    if (-not $script:CMakePresetsPath) {
         if ($Silent) {
             return $null
         }
-        Write-Error "Can't find CMakePresets.json"
+        Write-Error "Can't find 'CMakePresets.json' or 'CMakeUserPresets.json' in the current or any parent folder."
     }
-    $script:CMakePresetsPath = Join-Path -Path $CMakeRoot -ChildPath 'CMakePresets.json'
-    Write-Verbose "Presets = $CMakePresetsPath"
-    Get-Content $CMakePresetsPath | ConvertFrom-Json
+
+    $CMakeRoot = [System.IO.Path]::GetDirectoryName($CMakePresetsPath)
+    $CMakePresetsJson = $null
+
+    Write-Verbose "Presets = $CMakeRoot"
+
+    # If files were included, load them now and merge them in. Keep track of files that were included to avoid cycles.
+    $IncludedFiles = [System.Collections.Generic.HashSet[string]]::new()
+    [array] $IncludePaths = @(
+        $CMakePresetsPath
+        if ([System.IO.Path]::GetFileName($CMakePresetsPath) -ieq 'CMakeUserPresets.json') {
+            Join-Path -Path $CMakeRoot -ChildPath 'CMakePresets.json'
+        }
+    )
+
+    for (; ; ) {
+        $IncludePath, $IncludePaths = $IncludePaths
+        if (-not $IncludePath) {
+            break
+        }
+
+        Write-Verbose "Processing CMakePresets: $IncludePath"
+
+        # Macro substiution for include paths
+        $IncludePath = MacroReplacement $IncludePath $null
+
+        if (-not (Test-Path -Path $IncludePath -PathType Leaf)) {
+            Write-Error "Included CMake presets file '$IncludePath' not found."
+        }
+
+        if ($IncludedFiles.Contains($IncludePath)) {
+            Write-Error "Cyclic include detected for included CMake presets file '$IncludePath'."
+        }
+
+        $IncludeJson = Get-Content $IncludePath | ConvertFrom-Json
+        if (-not $CMakePresetsJson) {
+            $CMakePresetsJson = $IncludeJson
+        } else {
+            $CMakePresetsJson.buildPresets += Get-MemberValue -InputObject $IncludeJson -Name 'buildPresets' -Or @()
+            $CMakePresetsJson.configurePresets += Get-MemberValue -InputObject $IncludeJson -Name 'configurePresets' -Or @()
+        }
+
+        $IncludePaths += Get-MemberValue -InputObject $IncludeJson -Name 'include' -Or @()
+
+        # Add to included files set
+        $IncludedFiles.Add($IncludePath) | Out-Null
+    }
+
+    $CMakePresetsJson
 }
 
 <#
@@ -363,7 +419,9 @@ function MacroReplacement {
                 break
             }
             '\$\{presetName\}' {
-                $PresetJson.name
+                if ($PresetJson) {
+                    $PresetJson.name
+                }
                 break
             }
             '\$\{generator\}' {

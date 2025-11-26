@@ -97,13 +97,19 @@ function DownloadFile([string] $Url, [string] $DownloadPath) {
 
 <#
     .Synopsis
-    Searches the given location and parent folders looking for the given file.
+    Searches the given location and parent folders looking for the given file(s).
+
+    .Outputs
+    The path to the first matching file found, or $null if none found.
 #>
-function GetPathOfFileAbove([string]$Location, [string]$File) {
+function GetPathOfFileAbove([string]$Location, [string[]]$Files) {
     for (; $Location.Length -ne 0; $Location = Split-Path $Location) {
-        if (Test-Path -PathType Leaf -Path (Join-Path -Path $Location -ChildPath $File)) {
-            $Location
-            break
+        foreach ($File in $Files) {
+            $Candidate = Join-Path -Path $Location -ChildPath $File
+            if (Test-Path -PathType Leaf -Path $Candidate) {
+                $Candidate
+                break
+            }
         }
     }
 }
