@@ -50,7 +50,7 @@ jobs:
     steps:
       - name: Download __packages
         id: download
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: __packages
           path: __packages
