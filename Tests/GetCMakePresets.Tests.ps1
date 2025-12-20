@@ -6,8 +6,8 @@ BeforeAll {
 
 Describe 'GetCMakePresets' {
     It 'Loads the CMakePresets.json when running from a folder with a CMakePresets.json' {
-        Mock FindCMakeRoot {
-            Join-Path -Path $PSScriptRoot -ChildPath 'ReferenceBuild'
+        Mock FindCMakePresets {
+            Join-Path -Path $PSScriptRoot -ChildPath 'ReferenceBuild/CMakePresets.json'
         }
 
         $ActualCMakePresetsJson = GetCMakePresets
@@ -20,7 +20,7 @@ Describe 'GetCMakePresets' {
     }
 
     It 'Reports an error when a CMakePresets.json is not found' {
-        Mock FindCMakeRoot {
+        Mock FindCMakePresets {
             $null
         }
         { GetCMakePresets } |
@@ -28,7 +28,7 @@ Describe 'GetCMakePresets' {
     }
 
     It 'Reports an error when a CMakePresets.json is not found, unless -Silent is passed' {
-        Mock FindCMakeRoot {
+        Mock FindCMakePresets {
             $null
         }
         GetCMakePresets -Silent |
