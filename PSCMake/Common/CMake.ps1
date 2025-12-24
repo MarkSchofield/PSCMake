@@ -104,17 +104,6 @@ function GetCMakePresets {
 
         Write-Verbose "Processing CMakePresets: $IncludePath"
 
-        # Macro substiution for include paths
-        $IncludePath = MacroReplacement $IncludePath $null
-
-        if (-not (Test-Path -Path $IncludePath -PathType Leaf)) {
-            Write-Error "Included CMake presets file '$IncludePath' not found."
-        }
-
-        if ($IncludedFiles.Contains($IncludePath)) {
-            Write-Error "Cyclic include detected for included CMake presets file '$IncludePath'."
-        }
-
         $IncludeJson = Get-Content $IncludePath | ConvertFrom-Json
         if (-not $CMakePresetsJson) {
             $CMakePresetsJson = $IncludeJson
@@ -123,10 +112,27 @@ function GetCMakePresets {
             $CMakePresetsJson.configurePresets += Get-MemberValue -InputObject $IncludeJson -Name 'configurePresets' -Or @()
         }
 
-        $IncludePaths += Get-MemberValue -InputObject $IncludeJson -Name 'include' -Or @()
+        $NestedIncludePaths = Get-MemberValue -InputObject $IncludeJson -Name 'include' -Or @()
+        $IncludeRoot = [System.IO.Path]::GetDirectoryName($IncludePath)
+        foreach ($NestedIncludePath in $NestedIncludePaths) {
+            # Macro substiution for include paths
+            $NestedIncludePath = MacroReplacement $NestedIncludePath $null
 
-        # Add to included files set
-        $IncludedFiles.Add($IncludePath) | Out-Null
+            if (-not [System.IO.Path]::IsPathFullyQualified($NestedIncludePath)) {
+                $NestedIncludePath = Join-Path -Path $IncludeRoot -ChildPath $NestedIncludePath
+            }
+
+            if (-not (Test-Path -Path $NestedIncludePath -PathType Leaf)) {
+                Write-Error "Included CMake presets file '$NestedIncludePath' not found."
+            }
+
+            if ($IncludedFiles.Contains($NestedIncludePath)) {
+                Write-Error "Cyclic include detected for included CMake presets file '$NestedIncludePath'."
+            }
+
+            $IncludedFiles.Add($NestedIncludePath) | Out-Null
+            $IncludePaths = $NestedIncludePath
+        }
     }
 
     $CMakePresetsJson
