@@ -579,7 +579,7 @@ function GetScopedTargets {
     $SourceDir = $CodeModel.paths.source
     $CodeModelConfiguration.targets |
         Where-Object {
-            $Folder = $CodeModelConfiguration.directories[$_.directoryIndex].build
+            $Folder = $CodeModelConfiguration.directories[$_.directoryIndex].source
             $Folder = if ($Folder -eq '.') {
                 $SourceDir
             } else {
