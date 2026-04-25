@@ -313,22 +313,29 @@ function ResolvePresetProperty {
 
 <#
     .Synopsis
-    Returns $true if the preset (and all its ancestors) have conditions that evaluate to $true, $false otherwise.
+    Walks the preset inheritance chain to find the first ancestor that defines a 'condition' property, evaluates it, and returns the result. If no condition is found, returns $true.
 #>
 function EvaluatePresetCondition {
     param(
         $Preset,
         $Presets
     )
-    $Result = SearchAncestors -Preset $Preset -Presets $Presets {
+    $Scope = @{ Result = $null }
+    SearchAncestors -Preset $Preset -Presets $Presets {
         param($CurrentPreset)
-        $PresetConditionJson = Get-MemberValue $CurrentPreset 'condition'
-        if (($PresetConditionJson) -and
-            (-not (EvaluateCondition $PresetConditionJson $CurrentPreset))) {
-            return $false
+        $ConditionJson = Get-MemberValue $CurrentPreset 'condition'
+        if ($ConditionJson) {
+            if ($null -eq $Scope.Result) {
+                $Scope.Result = EvaluateCondition $ConditionJson $CurrentPreset
+            } else {
+                Write-Verbose "Preset '$($Preset.name)': condition on '$($CurrentPreset.name)' ignored (not the first condition in the inheritance chain)."
+            }
         }
     }
-    $Result -ne $false
+    if ($null -eq $Scope.Result) {
+        return $true
+    }
+    $Scope.Result
 }
 
 <#
