@@ -202,6 +202,11 @@ function ConfigurePresetsCompleter {
         Where-Object { $_ -ilike "$WordToComplete*" }
 }
 
+<#
+    .Synopsis
+    Runs cmake --preset for the given configure preset. Enables the File API query before invoking CMake so the
+    code-model reply is written into the binary directory on completion.
+#>
 function ConfigureCMake {
     param(
         [Parameter()]
@@ -298,9 +303,13 @@ function Configure-CMakeBuild {
     .Parameter Preset
 
     .Parameter Configuration
+    The CMake configuration name (e.g. 'Release', 'Debug') to build. Supports wildcards. If none is specified
+    all configurations are built.
 
     .Parameter Target
-    One or more
+    One or more CMake target names to build. Supports wildcards. If none is specified the default targets are
+    built, or — when the current directory is a subfolder of the CMake root — the targets whose source
+    directory falls under the current directory.
 
     .Parameter Configure
     A switch specifying whether the necessary configuration should be performed before the build is run.
@@ -429,6 +438,31 @@ function Build-CMakeBuild {
     }
 }
 
+<#
+    .Synopsis
+    Writes a dependency graph of a CMake build.
+
+    .Description
+    Reads the CMake File API code-model for the given preset and emits a dependency graph of all CMake targets
+    and their link dependencies in the requested format.
+
+    .Parameter Preset
+    The CMake build preset to graph. If none is specified the first available build preset is used.
+
+    .Parameter Configuration
+    The CMake configuration to graph (e.g. 'Debug', 'Release'). Defaults to 'Debug'.
+
+    .Parameter As
+    The output format: 'dot' (Graphviz DOT language) or 'dgml' (Visual Studio DGML). Defaults to 'dot'.
+
+    .Example
+    # Write a DOT graph for the 'windows-x64' build preset.
+    Write-CMakeBuild -Preset windows-x64 | Out-File deps.dot
+
+    .Example
+    # Write a DGML graph for the 'windows-x64' build preset and open it in Visual Studio.
+    Write-CMakeBuild -Preset windows-x64 -As dgml | Out-File deps.dgml
+#>
 function Write-CMakeBuild {
     param(
         [Parameter(Position = 0)]
