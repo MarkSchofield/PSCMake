@@ -167,6 +167,11 @@ function GetBuildPresets {
     }
 }
 
+<#
+    .Synopsis
+    Gets the build presets matching the given name(s). If no name is given, returns the first available preset.
+    Writes an error if a named preset cannot be found.
+#>
 function GetMatchingBuildPresets {
     param(
         $CMakePresetsJson,
@@ -234,6 +239,10 @@ function GetCMake {
     $CMake
 }
 
+<#
+    .Synopsis
+    Returns the configure preset referenced by the given build preset's 'configurePreset' field.
+#>
 function GetConfigurePresetFor {
     param(
         $CMakePresetsJson,
@@ -251,6 +260,10 @@ function GetConfigurePresetFor {
 
     .Parameter Presets
     The collection of presets to search for 'inherit' references.
+
+    .Parameter Action
+    A script block invoked for each preset in breadth-first order. Return $null to continue the walk; return
+    any non-$null value to stop and return that value to the caller.
 
     .Description
     The action should return $null to continue searching, or a non-$null value to stop searching and return that value.
@@ -282,6 +295,10 @@ function SearchAncestors {
     }
 }
 
+<#
+    .Synopsis
+    Walks the preset inheritance chain to find the first ancestor that defines the given property, and returns its value.
+#>
 function ResolvePresetProperty {
     param(
         $Preset,
@@ -294,6 +311,10 @@ function ResolvePresetProperty {
     }
 }
 
+<#
+    .Synopsis
+    Returns $true if the preset (and all its ancestors) have conditions that evaluate to $true, $false otherwise.
+#>
 function EvaluatePresetCondition {
     param(
         $Preset,
@@ -310,6 +331,11 @@ function EvaluatePresetCondition {
     $Result -ne $false
 }
 
+<#
+    .Synopsis
+    Evaluates a single CMake preset condition JSON object against the given preset's macro context.
+    Supports: equals, notEquals, inList, notInList, matches, notMatches, anyOf, allOf, not.
+#>
 function EvaluateCondition {
     param(
         $ConditionJson,
@@ -372,6 +398,11 @@ function EvaluateCondition {
     }
 }
 
+<#
+    .Synopsis
+    Resolves and returns the fully-qualified binary directory for the given configure preset, after performing
+    CMake macro substitution on the preset's 'binaryDir' value.
+#>
 function GetBinaryDirectory {
     param(
         $CMakePresetsJson,
@@ -386,6 +417,10 @@ function GetBinaryDirectory {
     [System.IO.Path]::GetFullPath($Result)
 }
 
+<#
+    .Synopsis
+    Returns the table of fixed CMake macro values that do not depend on a specific preset (e.g. ${hostSystemName}).
+#>
 function GetMacroConstants {
     $HostSystemName = if ($IsWindows) {
         'Windows'
@@ -403,6 +438,11 @@ function GetMacroConstants {
     }
 }
 
+<#
+    .Synopsis
+    Performs CMake preset macro substitution on the given string, expanding tokens such as ${sourceDir},
+    ${presetName}, ${hostSystemName}, $env{VAR}, $penv{VAR}, and $vendor{...}.
+#>
 function MacroReplacement {
     param(
         $Value,
@@ -465,6 +505,11 @@ function MacroReplacement {
     $Result -join ''
 }
 
+<#
+    .Synopsis
+    Creates the CMake File API query files in the binary directory so that the next cmake configure writes
+    code-model, cache, cmakeFiles, and toolchain reply JSON into '.cmake/api/v1/reply/'.
+#>
 function Enable-CMakeBuildQuery {
     [CmdletBinding()]
     param(
@@ -503,6 +548,10 @@ function FilterExecutableTargets {
         }
 }
 
+<#
+    .Synopsis
+    Returns the path to the CMake File API reply directory ('.cmake/api/v1/reply') inside the binary directory.
+#>
 function Get-CMakeBuildCodeModelDirectory {
     param(
         [string] $BinaryDirectory
@@ -590,6 +639,10 @@ function GetScopedTargets {
         }
 }
 
+<#
+    .Synopsis
+    Writes the CMake target dependency graph in Graphviz DOT format to the pipeline.
+#>
 function WriteDot {
     param (
         $Configuration,
@@ -612,6 +665,10 @@ function WriteDot {
     "}"
 }
 
+<#
+    .Synopsis
+    Writes the CMake target dependency graph in Visual Studio DGML format to the pipeline.
+#>
 function WriteDgml {
     param (
         $Configuration,

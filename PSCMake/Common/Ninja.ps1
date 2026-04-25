@@ -90,6 +90,11 @@ function ConvertTo-NinjaTime {
     $Time.ToFileTime() - $FileTimeOffset;
 }
 
+<#
+    .Synopsis
+    Reads the Ninja build log and writes a color-coded timing report for all build steps that ran at or after
+    the given start time, sorted from fastest to slowest.
+#>
 function Report-NinjaBuild {
     param(
         [string] $NinjaLogPath,
@@ -113,6 +118,11 @@ function Report-NinjaBuild {
         }
 }
 
+<#
+    .Synopsis
+    Downloads, verifies, and extracts the specified version of the Ninja build tool to the given output path.
+    Skips the download if the extracted binary is already up to date.
+#>
 function Download-Ninja {
     param(
         [string] $OutputPath,

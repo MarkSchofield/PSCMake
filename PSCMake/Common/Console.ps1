@@ -63,6 +63,11 @@ public static SafeFileHandle GetConOut()
 $script:Console = $null
 $script:IsVirtualTerminalProcessingEnabled = if ($IsWindows) { $null } else { $true }
 
+<#
+    .Synopsis
+    Lazily compiles and returns the inline C# type that exposes GetConIn, GetConOut, and GetConsoleMode for
+    querying virtual-terminal-processing state on Windows.
+#>
 function GetConsole {
     if (-not $script:Console) {
         $script:Console = Add-Type -Language CSharp -MemberDefinition $CSharpCode -Name NativeMethods -Namespace Console -PassThru -UsingNamespace 'Microsoft.Win32.SafeHandles' -ErrorAction SilentlyContinue

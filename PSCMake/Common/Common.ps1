@@ -26,6 +26,10 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+<#
+    .Synopsis
+    Returns the value of the named property on an object, or a fallback value if the property does not exist.
+#>
 function Get-MemberValue {
     [CmdletBinding()]
     param(
@@ -77,6 +81,11 @@ function IsUpToDate($Target) {
     $true
 }
 
+<#
+    .Synopsis
+    Temporarily changes the current location to the given path, runs the script block, then restores the
+    original location — even if the script block throws.
+#>
 function Using-Location($Location, $Scriptlet) {
     Push-Location -Path $Location
     try {
@@ -86,11 +95,19 @@ function Using-Location($Location, $Scriptlet) {
     }
 }
 
+<#
+    .Synopsis
+    Updates the LastWriteTime of the given file to the current time, equivalent to the Unix 'touch' command.
+#>
 function Touch($Item) {
     Write-Verbose "Touch: $Item"
     (Get-Item $Item).LastWriteTime = Get-Date
 }
 
+<#
+    .Synopsis
+    Downloads the resource at the given URL to the specified local path using WebClient.
+#>
 function DownloadFile([string] $Url, [string] $DownloadPath) {
     [System.Net.WebClient]::new().DownloadFile($Url, $DownloadPath)
 }
