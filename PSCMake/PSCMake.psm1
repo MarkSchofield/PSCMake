@@ -28,6 +28,7 @@ $ErrorActionPreference = 'Stop'
 
 . $PSScriptRoot/Common/CMake.ps1
 . $PSScriptRoot/Common/Common.ps1
+. $PSScriptRoot/Common/Includes.ps1
 . $PSScriptRoot/Common/Ninja.ps1
 
 <#
@@ -591,6 +592,134 @@ function Invoke-CMakeOutput {
     InvokeExecutable $TargetPath $Arguments
 }
 
+<#
+    .Synopsis
+    Recompiles a single source file and returns the include tree captured by the compiler.
+
+    .Description
+    `Get-CMakeIncludes` recompiles the given source file with include reporting enabled (/showIncludes for MSVC,
+    -H for Clang) and returns the include tree as a flat list of objects with Depth and Path properties. The
+    compile flags, include paths, and defines are read from the CMake File API code model for the given preset
+    and configuration, so no manual compiler invocation is needed.
+
+    Supported compilers: MSVC, Clang, AppleClang.
+
+    .Parameter Preset
+    The CMake build preset to use. If none is specified, the first available build preset is used.
+
+    .Parameter Configuration
+    The CMake configuration (e.g. 'Debug', 'Release'). If none is specified, the first available configuration
+    in the code model is used.
+
+    .Parameter SourceFile
+    Path to the C++ source file to analyze. May be absolute or relative to the current directory.
+
+    .Example
+    # Show all headers included when compiling MyFile.cpp for the windows-x64 preset.
+    Get-CMakeIncludes -Preset windows-x64 -Configuration Debug -SourceFile src/MyFile.cpp
+
+    .Example
+    # Find the deepest include chains for a file.
+    Get-CMakeIncludes windows-x64 Debug src/MyFile.cpp | Sort-Object Depth -Descending | Select-Object -First 10
+#>
+function Get-CMakeIncludes {
+    [CmdletBinding()]
+    param(
+        [Parameter(Position = 0)]
+        [string] $Preset,
+
+        [Parameter(Position = 1)]
+        [string] $Configuration,
+
+        [Parameter(Mandatory, Position = 2)]
+        [string] $SourceFile
+    )
+    $CMakePresetsJson = GetCMakePresets
+    $BuildPreset = GetMatchingBuildPresets $CMakePresetsJson $Preset | Select-Object -First 1
+    $ConfigurePreset = GetConfigurePresetFor $CMakePresetsJson $BuildPreset
+    $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
+
+    $CodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
+    if (-not $CodeModel) {
+        Write-Error "No code model found in '$BinaryDirectory'. Run Configure-CMakeBuild first."
+    }
+
+    $Toolchains = Get-CMakeBuildToolchains $BinaryDirectory
+    if (-not $Toolchains) {
+        Write-Error "No toolchain information found in '$BinaryDirectory'. Run Configure-CMakeBuild first."
+    }
+
+    $SourceFilePath = (Resolve-Path -LiteralPath $SourceFile).Path
+    $CompileInfo = GetCompileInfoForSource $CodeModel $BinaryDirectory $Configuration $SourceFilePath
+    if (-not $CompileInfo) {
+        Write-Error "Source file '$SourceFile' was not found in any target's source list."
+    }
+
+    $Toolchain = $Toolchains.toolchains | Where-Object { $_.language -eq $CompileInfo.Language } | Select-Object -First 1
+    if (-not $Toolchain) {
+        Write-Error "No toolchain found for language '$($CompileInfo.Language)'."
+    }
+
+    # Get the CompilerId
+    #
+    # If a 'CMAKE_<LANG>_COMPILER_FRONTEND_VARIANT' is in the cache, then use that. Otherwise, use the 'id' field from
+    # the toolchain JSON.
+    $Language = $CompileInfo.Language
+    $CompilerFrontendId = GetCacheValue $BinaryDirectory "CMAKE_$($Language)_COMPILER_FRONTEND_VARIANT"
+    $CompilerId = if ($CompilerFrontendId) {
+        $CompilerFrontendId
+    } else {
+        Get-MemberValue $Toolchain.compiler 'id'
+    }
+    if ($CompilerId -notin @('MSVC', 'Clang', 'AppleClang')) {
+        Write-Error "Compiler '$CompilerId' does not support include reporting via PSCMake. Supported compilers: MSVC, Clang."
+    }
+
+    Write-Verbose "Get-CMakeIncludes: Compiler ID: $CompilerId"
+
+    $CompilerPath = $Toolchain.compiler.path
+    $CompilerArgs = @()
+
+    $CompilerArgs += $CompileInfo.Fragments |
+        ForEach-Object { $_.fragment -split '\s+' } |
+        Where-Object { $_ }
+
+    $CompilerArgs += if ($CompilerId -eq 'MSVC') {
+        $CompileInfo.Includes | ForEach-Object { "/I"; $_.path }
+    } else {
+        $CompileInfo.Includes | ForEach-Object { "-I"; $_.path }
+    }
+
+    $CompilerArgs += if ($CompilerId -eq 'MSVC') {
+        $CompileInfo.Defines | ForEach-Object { "/D$($_.define)" }
+    } else {
+        $CompileInfo.Defines | ForEach-Object { "-D$($_.define)" }
+    }
+
+    if ($CompilerId -eq 'MSVC') {
+        $CompilerArgs += @('/showIncludes', '/nologo', '/c', $SourceFilePath, '/Zs')
+    } else {
+        $CompilerArgs += @('-H', '-c', $SourceFilePath, '-fsyntax-only')
+    }
+
+    Write-Verbose "Get-CMakeIncludes: Compiler : $CompilerPath"
+    Write-Verbose "Get-CMakeIncludes: Arguments: $($CompilerArgs -join ' ')"
+
+    $Output = Using-Location $CompileInfo.BuildDir {
+        InvokeCompilerForIncludes $CompilerPath $CompilerArgs
+    }
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "Get-CMakeIncludes: Compiler exited with code $LASTEXITCODE. Include information may be incomplete."
+    }
+
+    if ($CompilerId -eq 'MSVC') {
+        ParseMSVCIncludes $Output
+    } else {
+        ParseClangIncludes $Output
+    }
+}
+
 Register-ArgumentCompleter -CommandName Invoke-CMakeOutput -ParameterName Preset -ScriptBlock $function:BuildPresetsCompleter
 Register-ArgumentCompleter -CommandName Invoke-CMakeOutput -ParameterName Configuration -ScriptBlock $function:BuildConfigurationsCompleter
 Register-ArgumentCompleter -CommandName Invoke-CMakeOutput -ParameterName Target -ScriptBlock $function:ExecutableTargetsCompleter
@@ -603,3 +732,6 @@ Register-ArgumentCompleter -CommandName Configure-CMakeBuild -ParameterName Pres
 
 Register-ArgumentCompleter -CommandName Write-CMakeBuild -ParameterName Preset -ScriptBlock $function:BuildPresetsCompleter
 Register-ArgumentCompleter -CommandName Write-CMakeBuild -ParameterName Configuration -ScriptBlock $function:BuildConfigurationsCompleter
+
+Register-ArgumentCompleter -CommandName Get-CMakeIncludes -ParameterName Preset -ScriptBlock $function:BuildPresetsCompleter
+Register-ArgumentCompleter -CommandName Get-CMakeIncludes -ParameterName Configuration -ScriptBlock $function:BuildConfigurationsCompleter

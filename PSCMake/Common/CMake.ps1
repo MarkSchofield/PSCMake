@@ -641,6 +641,25 @@ function GetScopedTargets {
 
 <#
     .Synopsis
+    Gets the value of a CMake cache entry.
+#>
+function GetCacheValue {
+    param(
+        [string] $BinaryDirectory,
+        [string] $CacheEntryName
+    )
+    $CMakeCacheFile = Join-Path -Path $BinaryDirectory -ChildPath 'CMakeCache.txt'
+    if (Test-Path -LiteralPath $CMakeCacheFile) {
+        Get-Content -LiteralPath $CMakeCacheFile |
+            Select-String "^$($CacheEntryName):.*=" |
+            ForEach-Object {
+                $_.ToString().Split('=', 2) | Select-Object -Last 1
+        }
+    }
+}
+
+<#
+    .Synopsis
     Writes the CMake target dependency graph in Graphviz DOT format to the pipeline.
 #>
 function WriteDot {
