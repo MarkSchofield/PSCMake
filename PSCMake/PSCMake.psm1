@@ -219,7 +219,9 @@ function ConfigureCMake {
         [Parameter()]
         $ConfigurePreset,
 
-        [switch] $Fresh
+        [switch] $Fresh,
+
+        [string[]] $Arguments = @()
     )
     $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
     Enable-CMakeBuildQuery $BinaryDirectory
@@ -232,6 +234,7 @@ function ConfigureCMake {
         if ($VerbosePreference) {
             '--log-level=VERBOSE'
         }
+        $Arguments
     )
 
     InvokeExecutable $CMake $CMakeArguments
@@ -253,6 +256,9 @@ function ConfigureCMake {
     .Parameter Fresh
     A switch specifying whether a 'fresh' configuration is performed - removing any existing cache.
 
+    .Parameter Arguments
+    Additional arguments passed directly to the CMake configure invocation.
+
     .Example
     # Configure the 'windows-x64' and 'windows-x86' CMake builds.
     Configure-CMakeBuild -Preset windows-x64,windows-x86
@@ -266,7 +272,10 @@ function Configure-CMakeBuild {
         [string[]] $Preset,
 
         [Parameter()]
-        [switch] $Fresh
+        [switch] $Fresh,
+
+        [Parameter()]
+        [string[]] $Arguments = @()
     )
     $CMakeRoot = FindCMakeRoot
     $CMakePresetsJson = GetCMakePresets
@@ -289,7 +298,7 @@ function Configure-CMakeBuild {
         foreach ($ConfigurePreset in $ConfigurePresets) {
             Write-Output "Preset         : $($ConfigurePreset.name)"
 
-            ConfigureCMake -CMake $CMake $CMakePresetsJson $ConfigurePreset -Fresh:$Fresh
+            ConfigureCMake -CMake $CMake $CMakePresetsJson $ConfigurePreset -Fresh:$Fresh -Arguments:$Arguments
         }
     }
 }
@@ -320,6 +329,9 @@ function Configure-CMakeBuild {
 
     .Parameter Fresh
     A switch specifying whether a 'fresh' configuration should be performed before the build is run.
+
+    .Parameter Arguments
+    Additional arguments passed directly to the CMake build invocation.
 
     .Example
     # Build the 'windows-x64' and 'windows-x86' CMake builds.
@@ -356,11 +368,16 @@ function Build-CMakeBuild {
         [switch] $Report,
 
         [Parameter()]
-        [switch] $Fresh
+        [switch] $Fresh,
+
+        [Parameter()]
+        [string[]] $Arguments = @()
     )
     $CMakeRoot = FindCMakeRoot
     $CMakePresetsJson = GetCMakePresets
     $BuildPresets = GetMatchingBuildPresets $CMakePresetsJson $Preset
+
+    Write-Verbose "Arguments: $Arguments"
 
     # If;
     #   * no targets were specified, and
@@ -424,6 +441,10 @@ function Build-CMakeBuild {
                         $TargetNames
                     }
                 )
+
+                # Add extra arguments to the CMake build invocation.
+                $CMakeArguments += $Arguments
+                Write-Verbose "CMake Arguments: $CMakeArguments"
 
                 $StartTime = [datetime]::Now
                 InvokeExecutable $CMake $CMakeArguments
