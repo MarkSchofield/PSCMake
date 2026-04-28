@@ -69,7 +69,7 @@ PowerShellVersion = '7.0'
 # NestedModules = @()
 
 # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
-FunctionsToExport = 'Build-CMakeBuild', 'Configure-CMakeBuild', 'Get-CMakeIncludes', 'Write-CMakeBuild', 'Invoke-CMakeOutput'
+FunctionsToExport = 'Build-CMakeBuild', 'Configure-CMakeBuild', 'Get-CMakeIncludes', 'Get-CMakePreprocess', 'Write-CMakeBuild', 'Invoke-CMakeOutput'
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
 CmdletsToExport = @()
