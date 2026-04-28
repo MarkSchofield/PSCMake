@@ -28,21 +28,6 @@ $ErrorActionPreference = 'Stop'
 
 <#
     .Synopsis
-    Invokes the compiler and returns combined stdout+stderr as an array of strings.
-
-    .Description
-    A function wrapping the compiler invocation, allowing it to be mocked for testing.
-#>
-function InvokeCompilerForIncludes {
-    param(
-        [string] $Path,
-        [string[]] $Arguments
-    )
-    & $Path @Arguments 2>&1 | ForEach-Object { "$_" }
-}
-
-<#
-    .Synopsis
     Reads the toolchains-v1 File API reply for the given binary directory.
 #>
 function Get-CMakeBuildToolchains {
@@ -53,6 +38,67 @@ function Get-CMakeBuildToolchains {
         Select-Object -First 1 |
         Get-Content |
         ConvertFrom-Json
+}
+
+<#
+    .Synopsis
+    Resolves the compiler path, ID, and base argument list for a given source file.
+
+    .Description
+    Looks up the compile group for $SourceFilePath in the code model, determines the compiler ID (preferring
+    CMAKE_<LANG>_COMPILER_FRONTEND_VARIANT when present), and builds the fragment/include/define arguments.
+    Returns a PSCustomObject with CompilerId, CompilerPath, CompilerArgs, and BuildDir, or $null if the source
+    file was not found in any target.
+#>
+function GetCompilerInvocationForSource {
+    param(
+        $CodeModel,
+        $Toolchains,
+        [string] $BinaryDirectory,
+        [string] $Configuration,
+        [string] $SourceFilePath
+    )
+    $CompileInfo = GetCompileInfoForSource $CodeModel $BinaryDirectory $Configuration $SourceFilePath
+    if (-not $CompileInfo) {
+        return $null
+    }
+
+    $Toolchain = $Toolchains.toolchains | Where-Object { $_.language -eq $CompileInfo.Language } | Select-Object -First 1
+    if (-not $Toolchain) {
+        Write-Error "No toolchain found for language '$($CompileInfo.Language)'."
+    }
+
+    # Prefer CMAKE_<LANG>_COMPILER_FRONTEND_VARIANT when set; it reflects the actual flag syntax
+    # (e.g. clang-cl reports 'MSVC' here even though the compiler id is 'Clang').
+    $Language = $CompileInfo.Language
+    $CompilerFrontendId = GetCacheValue $BinaryDirectory "CMAKE_$($Language)_COMPILER_FRONTEND_VARIANT"
+    $CompilerId = if ($CompilerFrontendId) { $CompilerFrontendId } else { Get-MemberValue $Toolchain.compiler 'id' }
+
+    if ($CompilerId -notin @('MSVC', 'Clang', 'AppleClang')) {
+        Write-Error "Compiler '$CompilerId' is not supported by PSCMake. Supported compilers: MSVC, Clang, AppleClang."
+    }
+
+    $CompilerArgs = @()
+    $CompilerArgs += $CompileInfo.Fragments |
+        ForEach-Object { $_.fragment -split '\s+' } |
+        Where-Object { $_ }
+    $CompilerArgs += if ($CompilerId -eq 'MSVC') {
+        $CompileInfo.Includes | ForEach-Object { "/I"; $_.path }
+    } else {
+        $CompileInfo.Includes | ForEach-Object { "-I"; $_.path }
+    }
+    $CompilerArgs += if ($CompilerId -eq 'MSVC') {
+        $CompileInfo.Defines | ForEach-Object { "/D$($_.define)" }
+    } else {
+        $CompileInfo.Defines | ForEach-Object { "-D$($_.define)" }
+    }
+
+    [PSCustomObject]@{
+        CompilerId   = $CompilerId
+        CompilerPath = $Toolchain.compiler.path
+        CompilerArgs = $CompilerArgs
+        BuildDir     = $CompileInfo.BuildDir
+    }
 }
 
 <#

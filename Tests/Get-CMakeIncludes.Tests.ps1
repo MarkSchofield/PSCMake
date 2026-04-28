@@ -140,7 +140,7 @@ Describe 'Get-CMakeIncludes' {
         Import-Module -Force $PSScriptRoot/../PSCMake/PSCMake.psd1 -DisableNameChecking
 
         $script:CompilerCalls = @()
-        Mock -ModuleName PSCMake InvokeCompilerForIncludes {
+        Mock -ModuleName PSCMake InvokeExecutable {
             param([string] $Path, [string[]] $Arguments)
             $script:CompilerCalls += , @{ Path = $Path; Arguments = $Arguments }
             @(
