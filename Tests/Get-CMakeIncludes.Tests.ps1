@@ -164,6 +164,13 @@ Describe 'Get-CMakeIncludes' {
         }
     }
 
+    It 'Returns nodes typed as PSCMake.IncludeNode' {
+        Using-Location "$PSScriptRoot/ReferenceBuild" {
+            $Result = Get-CMakeIncludes -Preset windows-x64 -Configuration Debug -SourceFile Reference.cpp
+            $Result[0].PSObject.TypeNames | Should -Contain 'PSCMake.IncludeNode'
+        }
+    }
+
     It 'Passes /showIncludes and /nologo to the MSVC compiler' {
         Using-Location "$PSScriptRoot/ReferenceBuild" {
             $null = Get-CMakeIncludes -Preset windows-x64 -Configuration Debug -SourceFile Reference.cpp

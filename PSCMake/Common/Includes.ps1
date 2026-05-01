@@ -170,6 +170,7 @@ function ParseMSVCIncludes {
     foreach ($Line in $Output) {
         if ($Line -match '^Note: including file:( +)(.+)$') {
             [PSCustomObject]@{
+                PSTypeName = 'PSCMake.IncludeNode'
                 Depth = $Matches[1].Length
                 Path  = $Matches[2].TrimEnd()
             }
@@ -190,6 +191,7 @@ function ParseClangIncludes {
     foreach ($Line in $Output) {
         if ($Line -match '^(\.+) (.+)$') {
             [PSCustomObject]@{
+                PSTypeName = 'PSCMake.IncludeNode'
                 Depth = $Matches[1].Length
                 Path  = $Matches[2].TrimEnd()
             }
