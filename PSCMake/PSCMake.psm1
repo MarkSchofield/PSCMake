@@ -618,7 +618,7 @@ function Invoke-CMakeOutput {
     Recompiles a single source file and returns the include tree captured by the compiler.
 
     .Description
-    `Get-CMakeIncludes` recompiles the given source file with include reporting enabled (/showIncludes for MSVC,
+    `Get-CMakeInclude` recompiles the given source file with include reporting enabled (/showIncludes for MSVC,
     -H for Clang) and returns the include tree as a flat list of objects with Depth and Path properties. The
     compile flags, include paths, and defines are read from the CMake File API code model for the given preset
     and configuration, so no manual compiler invocation is needed.
@@ -637,13 +637,13 @@ function Invoke-CMakeOutput {
 
     .Example
     # Show all headers included when compiling MyFile.cpp for the windows-x64 preset.
-    Get-CMakeIncludes -Preset windows-x64 -Configuration Debug -SourceFile src/MyFile.cpp
+    Get-CMakeInclude -Preset windows-x64 -Configuration Debug -SourceFile src/MyFile.cpp
 
     .Example
     # Find the deepest include chains for a file.
-    Get-CMakeIncludes windows-x64 Debug src/MyFile.cpp | Sort-Object Depth -Descending | Select-Object -First 10
+    Get-CMakeInclude windows-x64 Debug src/MyFile.cpp | Sort-Object Depth -Descending | Select-Object -First 10
 #>
-function Get-CMakeIncludes {
+function Get-CMakeInclude {
     [CmdletBinding()]
     param(
         [Parameter(Position = 0)]
@@ -668,7 +668,7 @@ function Get-CMakeIncludes {
         Write-Error "No code model found in '$BinaryDirectory'. Run Configure-CMakeBuild first."
     }
 
-    $Toolchains = Get-CMakeBuildToolchains $BinaryDirectory
+    $Toolchains = Get-CMakeBuildToolchain $BinaryDirectory
     if (-not $Toolchains) {
         Write-Error "No toolchain information found in '$BinaryDirectory'. Run Configure-CMakeBuild first."
     }
@@ -691,16 +691,16 @@ function Get-CMakeIncludes {
         $CompilerArgs += @('-H', '-c', $SourceFilePath, '-fsyntax-only')
     }
 
-    Write-Verbose "Get-CMakeIncludes: Compiler ID: $($Invocation.CompilerId)"
-    Write-Verbose "Get-CMakeIncludes: Compiler : $($Invocation.CompilerPath)"
-    Write-Verbose "Get-CMakeIncludes: Arguments: $($CompilerArgs -join ' ')"
+    Write-Verbose "Get-CMakeInclude: Compiler ID: $($Invocation.CompilerId)"
+    Write-Verbose "Get-CMakeInclude: Compiler : $($Invocation.CompilerPath)"
+    Write-Verbose "Get-CMakeInclude: Arguments: $($CompilerArgs -join ' ')"
 
     $Output = Using-Location $Invocation.BuildDir {
         InvokeExecutable $Invocation.CompilerPath $CompilerArgs 2>&1
     }
 
     if ((Test-Path variable:LASTEXITCODE) -and ($LASTEXITCODE -ne 0)) {
-        Write-Warning "Get-CMakeIncludes: Compiler exited with code $LASTEXITCODE. Include information may be incomplete."
+        Write-Warning "Get-CMakeInclude: Compiler exited with code $LASTEXITCODE. Include information may be incomplete."
     }
 
     if ($Invocation.CompilerId -eq 'MSVC') {
@@ -762,7 +762,7 @@ function Get-CMakePreprocess {
         Write-Error "No code model found in '$BinaryDirectory'. Run Configure-CMakeBuild first."
     }
 
-    $Toolchains = Get-CMakeBuildToolchains $BinaryDirectory
+    $Toolchains = Get-CMakeBuildToolchain $BinaryDirectory
     if (-not $Toolchains) {
         Write-Error "No toolchain information found in '$BinaryDirectory'. Run Configure-CMakeBuild first."
     }
@@ -811,5 +811,5 @@ Register-ArgumentCompleter -CommandName Configure-CMakeBuild -ParameterName Pres
 Register-ArgumentCompleter -CommandName Write-CMakeBuild -ParameterName Preset -ScriptBlock $function:BuildPresetsCompleter
 Register-ArgumentCompleter -CommandName Write-CMakeBuild -ParameterName Configuration -ScriptBlock $function:BuildConfigurationsCompleter
 
-Register-ArgumentCompleter -CommandName Get-CMakeIncludes -ParameterName Preset -ScriptBlock $function:BuildPresetsCompleter
-Register-ArgumentCompleter -CommandName Get-CMakeIncludes -ParameterName Configuration -ScriptBlock $function:BuildConfigurationsCompleter
+Register-ArgumentCompleter -CommandName Get-CMakeInclude -ParameterName Preset -ScriptBlock $function:BuildPresetsCompleter
+Register-ArgumentCompleter -CommandName Get-CMakeInclude -ParameterName Configuration -ScriptBlock $function:BuildConfigurationsCompleter

@@ -26,7 +26,7 @@
   <ViewDefinitions>
 
     <!--
-      PSCMake.IncludeNode — emitted by Get-CMakeIncludes.
+      PSCMake.IncludeNode — emitted by Get-CMakeInclude.
       Renders a flat list of include nodes as a Unicode tree, using the Depth
       property to compute the indentation prefix for each entry.
     -->
