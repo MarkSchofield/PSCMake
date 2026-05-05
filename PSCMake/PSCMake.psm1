@@ -653,7 +653,10 @@ function Get-CMakeIncludes {
         [string] $Configuration,
 
         [Parameter(Mandatory, Position = 2)]
-        [string] $SourceFile
+        [string] $SourceFile,
+
+        [Parameter()]
+        [switch] $IncludePchHeaders
     )
     $CMakePresetsJson = GetCMakePresets
     $BuildPreset = GetMatchingBuildPresets $CMakePresetsJson $Preset | Select-Object -First 1
@@ -677,6 +680,11 @@ function Get-CMakeIncludes {
     }
 
     $CompilerArgs = $Invocation.CompilerArgs
+
+    if (($Invocation.CompilerId -eq 'MSVC') -and ($IncludePchHeaders)) {
+        $CompilerArgs = $CompilerArgs | Where-Object { $_ -notlike '/Yu*' }
+    }
+
     if ($Invocation.CompilerId -eq 'MSVC') {
         $CompilerArgs += @('/showIncludes', '/nologo', '/c', $SourceFilePath, '/Zs')
     } else {
