@@ -696,7 +696,7 @@ function Get-CMakeIncludes {
     Write-Verbose "Get-CMakeIncludes: Arguments: $($CompilerArgs -join ' ')"
 
     $Output = Using-Location $Invocation.BuildDir {
-        InvokeExecutable $Invocation.CompilerPath $CompilerArgs
+        InvokeExecutable $Invocation.CompilerPath $CompilerArgs 2>&1
     }
 
     if ((Test-Path variable:LASTEXITCODE) -and ($LASTEXITCODE -ne 0)) {
