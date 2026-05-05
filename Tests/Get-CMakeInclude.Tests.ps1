@@ -96,15 +96,15 @@ Describe 'ParseClangIncludes' {
     }
 }
 
-Describe 'Get-CMakeBuildToolchains' {
+Describe 'Get-CMakeBuildToolchain' {
     It 'Returns toolchain data from the reference build' {
-        $Toolchains = Get-CMakeBuildToolchains $script:Props.BinaryDirectory
+        $Toolchains = Get-CMakeBuildToolchain $script:Props.BinaryDirectory
         $Toolchains | Should -Not -BeNullOrEmpty
         $Toolchains.toolchains | Should -Not -BeNullOrEmpty
     }
 
     It 'Exposes a CXX toolchain with MSVC compiler' {
-        $Toolchains = Get-CMakeBuildToolchains $script:Props.BinaryDirectory
+        $Toolchains = Get-CMakeBuildToolchain $script:Props.BinaryDirectory
         $CxxToolchain = $Toolchains.toolchains | Where-Object { $_.language -eq 'CXX' }
         $CxxToolchain | Should -Not -BeNullOrEmpty
         $CxxToolchain.compiler.id | Should -Be 'MSVC'
@@ -135,7 +135,7 @@ Describe 'GetCompileInfoForSource' {
     }
 }
 
-Describe 'Get-CMakeIncludes' {
+Describe 'Get-CMakeInclude' {
     BeforeAll {
         Import-Module -Force $PSScriptRoot/../PSCMake/PSCMake.psd1 -DisableNameChecking
 
@@ -157,7 +157,7 @@ Describe 'Get-CMakeIncludes' {
 
     It 'Returns include nodes for a source file' {
         Using-Location "$PSScriptRoot/ReferenceBuild" {
-            $Result = Get-CMakeIncludes -Preset windows-x64 -Configuration Debug -SourceFile Reference.cpp
+            $Result = Get-CMakeInclude -Preset windows-x64 -Configuration Debug -SourceFile Reference.cpp
             $Result | Should -HaveCount 2
             $Result[0].Depth | Should -Be 1
             $Result[1].Depth | Should -Be 2
@@ -166,14 +166,14 @@ Describe 'Get-CMakeIncludes' {
 
     It 'Returns nodes typed as PSCMake.IncludeNode' {
         Using-Location "$PSScriptRoot/ReferenceBuild" {
-            $Result = Get-CMakeIncludes -Preset windows-x64 -Configuration Debug -SourceFile Reference.cpp
+            $Result = Get-CMakeInclude -Preset windows-x64 -Configuration Debug -SourceFile Reference.cpp
             $Result[0].PSObject.TypeNames | Should -Contain 'PSCMake.IncludeNode'
         }
     }
 
     It 'Passes /showIncludes and /nologo to the MSVC compiler' {
         Using-Location "$PSScriptRoot/ReferenceBuild" {
-            $null = Get-CMakeIncludes -Preset windows-x64 -Configuration Debug -SourceFile Reference.cpp
+            $null = Get-CMakeInclude -Preset windows-x64 -Configuration Debug -SourceFile Reference.cpp
         }
         $script:CompilerCalls | Should -HaveCount 1
         $script:CompilerCalls[0].Arguments | Should -Contain '/showIncludes'
@@ -183,7 +183,7 @@ Describe 'Get-CMakeIncludes' {
 
     It 'Invokes the compiler path from the toolchain' {
         Using-Location "$PSScriptRoot/ReferenceBuild" {
-            $null = Get-CMakeIncludes -Preset windows-x64 -Configuration Debug -SourceFile Reference.cpp
+            $null = Get-CMakeInclude -Preset windows-x64 -Configuration Debug -SourceFile Reference.cpp
         }
         $script:CompilerCalls[0].Path | Should -Match 'cl\.exe$'
     }

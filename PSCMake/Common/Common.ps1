@@ -84,7 +84,7 @@ function IsUpToDate($Target) {
 <#
     .Synopsis
     Temporarily changes the current location to the given path, runs the script block, then restores the
-    original location — even if the script block throws.
+    original location - even if the script block throws.
 #>
 function Using-Location($Location, $Scriptlet) {
     Push-Location -Path $Location

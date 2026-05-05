@@ -30,7 +30,7 @@ $ErrorActionPreference = 'Stop'
     .Synopsis
     Reads the toolchains-v1 File API reply for the given binary directory.
 #>
-function Get-CMakeBuildToolchains {
+function Get-CMakeBuildToolchain {
     param(
         [string] $BinaryDirectory
     )
