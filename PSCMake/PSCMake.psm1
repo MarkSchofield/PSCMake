@@ -318,7 +318,7 @@ function Configure-CMakeBuild {
 
     .Parameter Target
     One or more CMake target names to build. Supports wildcards. If none is specified the default targets are
-    built, or — when the current directory is a subfolder of the CMake root — the targets whose source
+    built, or - when the current directory is a subfolder of the CMake root - the targets whose source
     directory falls under the current directory.
 
     .Parameter Configure
