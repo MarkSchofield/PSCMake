@@ -36,6 +36,8 @@ The module provides the following commands:
 2. `Build-CMakeBuild` - To run a CMake build.
 3. `Write-CMakeBuild` - To output the CMake build as a DOT or DGML graph.
 4. `Invoke-CMakeOutput` - To run an executable output from a CMake build, by target name or implicitly by scope.
+5. `Get-CMakeInclude` - Gets the fully-qualified paths to the headers included by a given source file.
+6. `Get-CMakePreprocess` - Gets the pre-processed output of a given source file.
 
 Running `Build-CMakeBuild` by itself would run the first `buildConfiguration`. Run any command with `-?` to get more
 details.

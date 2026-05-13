@@ -7,7 +7,7 @@ $ErrorActionPreference = 'Stop'
 . $PSScriptRoot/../PSCMake/Common/Ninja.ps1
 
 # Get ninja.exe
-function PrepareReferenceBuild() {
+function PrepareReferenceBuild($Preset = 'windows-x64') {
     $NinjaCommand = Get-Command 'ninja.exe' -ErrorAction SilentlyContinue
     $NinjaPath = if ($NinjaCommand) {
         $NinjaCommand.Source
@@ -25,7 +25,7 @@ function PrepareReferenceBuild() {
         Select-Object -First 1
 
     # Write the CMake query files
-    $BinaryDirectory = New-Item -Path "$PSScriptRoot/ReferenceBuild/__output/windows-x64" -ItemType Directory -Force
+    $BinaryDirectory = New-Item -Path "$PSScriptRoot/ReferenceBuild/__output/$Preset" -ItemType Directory -Force
 
     Enable-CMakeBuildQuery $BinaryDirectory
 
@@ -35,7 +35,7 @@ function PrepareReferenceBuild() {
     $CMAKE_MAKE_PROGRAM = $NinjaPath.Replace('\', '/')
 
     @(
-        "--preset", "windows-x64",
+        "--preset", $Preset,
         "-S", $BuildPath
         "-DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER"
         "-DCMAKE_MAKE_PROGRAM=$CMAKE_MAKE_PROGRAM"

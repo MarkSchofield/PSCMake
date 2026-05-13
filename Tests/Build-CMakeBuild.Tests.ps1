@@ -115,4 +115,42 @@ Describe 'Build-CMakeBuild' {
         $CMakeCalls | Should -HaveCount 1
         $script:CMakeCalls[0] | Should -Be @('--build', '--preset', 'windows-x64', '--target', 'SubDirectory_Executable', 'SubDirectory_Library')
     }
+
+    It 'Passes a single extra argument to CMake' {
+        Using-Location "$PSScriptRoot/ReferenceBuild" {
+            Build-CMakeBuild -Preset windows-x64 -Arguments '--parallel'
+        }
+
+        $script:CMakeCalls | Should -HaveCount 1
+        $script:CMakeCalls[0] | Should -Be @('--build', '--preset', 'windows-x64', '--parallel')
+    }
+
+    It 'Passes multiple extra arguments to CMake' {
+        Using-Location "$PSScriptRoot/ReferenceBuild" {
+            Build-CMakeBuild -Preset windows-x64 -Arguments '--parallel', '8'
+        }
+
+        $script:CMakeCalls | Should -HaveCount 1
+        $script:CMakeCalls[0] | Should -Be @('--build', '--preset', 'windows-x64', '--parallel', '8')
+    }
+
+    It 'Passes extra arguments after other build arguments' {
+        Using-Location "$PSScriptRoot/ReferenceBuild" {
+            Build-CMakeBuild -Preset windows-x64 -Target B_Library -Arguments '--parallel'
+        }
+
+        $script:CMakeCalls | Should -HaveCount 1
+        $script:CMakeCalls[0] | Should -Be @('--build', '--preset', 'windows-x64', '--target', 'B_Library', '--parallel')
+    }
+
+    It 'Passes extra arguments to the build step only when -Fresh is specified' {
+        Using-Location "$PSScriptRoot/ReferenceBuild" {
+            Build-CMakeBuild -Preset windows-x64 -Fresh -Arguments '--parallel'
+        }
+
+        $script:CMakeCalls | Should -HaveCount 2
+        $script:CMakeCalls[0] | Should -Be @('--preset', 'windows-x64', '--fresh')
+        $script:CMakeCalls[1] | Should -Be @('--build', '--preset', 'windows-x64', '--parallel')
+    }
+
 }

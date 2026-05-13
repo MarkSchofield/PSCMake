@@ -26,6 +26,10 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+<#
+    .Synopsis
+    Returns the value of the named property on an object, or a fallback value if the property does not exist.
+#>
 function Get-MemberValue {
     [CmdletBinding()]
     param(
@@ -77,6 +81,11 @@ function IsUpToDate($Target) {
     $true
 }
 
+<#
+    .Synopsis
+    Temporarily changes the current location to the given path, runs the script block, then restores the
+    original location - even if the script block throws.
+#>
 function Using-Location($Location, $Scriptlet) {
     Push-Location -Path $Location
     try {
@@ -86,24 +95,38 @@ function Using-Location($Location, $Scriptlet) {
     }
 }
 
+<#
+    .Synopsis
+    Updates the LastWriteTime of the given file to the current time, equivalent to the Unix 'touch' command.
+#>
 function Touch($Item) {
     Write-Verbose "Touch: $Item"
     (Get-Item $Item).LastWriteTime = Get-Date
 }
 
+<#
+    .Synopsis
+    Downloads the resource at the given URL to the specified local path using WebClient.
+#>
 function DownloadFile([string] $Url, [string] $DownloadPath) {
     [System.Net.WebClient]::new().DownloadFile($Url, $DownloadPath)
 }
 
 <#
     .Synopsis
-    Searches the given location and parent folders looking for the given file.
+    Searches the given location and parent folders looking for the given file(s).
+
+    .Outputs
+    The path to the first matching file found, or $null if none found.
 #>
-function GetPathOfFileAbove([string]$Location, [string]$File) {
+function GetPathOfFileAbove([string]$Location, [string[]]$Files) {
     for (; $Location.Length -ne 0; $Location = Split-Path $Location) {
-        if (Test-Path -PathType Leaf -Path (Join-Path -Path $Location -ChildPath $File)) {
-            $Location
-            break
+        foreach ($File in $Files) {
+            $Candidate = Join-Path -Path $Location -ChildPath $File
+            if (Test-Path -PathType Leaf -Path $Candidate) {
+                $Candidate
+                break
+            }
         }
     }
 }

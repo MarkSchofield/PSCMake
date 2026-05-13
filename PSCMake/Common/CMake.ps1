@@ -39,18 +39,28 @@ $CMakeCandidates = @(
 
 <#
     .Synopsis
-    Finds the root of the CMake build - the current or ancestral folder containing a 'CMakePresets.json' file.
+    Finds the path of the CMakePresets file in the current or ancestral folder. This may be a 'CMakePresets.json' file
+    or a 'CMakeUserPresets.json' file.
+#>
+function FindCMakePresets {
+    $CurrentLocation = (Get-Location).Path
+    GetPathOfFileAbove $CurrentLocation 'CMakeUserPresets.json', 'CMakePresets.json'
+}
+
+<#
+    .Synopsis
+    Finds the root of the CMake build - the current or ancestral folder containing CMake presets.
 #>
 function FindCMakeRoot {
-    $CurrentLocation = (Get-Location).Path
-    GetPathOfFileAbove $CurrentLocation 'CMakePresets.json'
+    $CMakePresetsPath = FindCMakePresets
+    [System.IO.Path]::GetDirectoryName($CMakePresetsPath)
 }
 
 $script:CMakePresetsPath = $null
 
 <#
     .Synopsis
-    Gets the path that the most recently loaded CMakePresets.json was loaded from.
+    Gets the path that the most recently loaded 'CMakePresets.json' or 'CMakeUserPresets.json' was loaded from.
 #>
 function GetCMakePresetsPath {
     $script:CMakePresetsPath
@@ -64,23 +74,75 @@ function GetCMakePresets {
     param(
         [switch] $Silent
     )
-    $CMakeRoot = FindCMakeRoot
-    if (-not $CMakeRoot) {
+    $script:CMakePresetsPath = FindCMakePresets
+    if (-not $script:CMakePresetsPath) {
         if ($Silent) {
             return $null
         }
-        Write-Error "Can't find CMakePresets.json"
+        Write-Error "Can't find 'CMakePresets.json' or 'CMakeUserPresets.json' in the current or any parent folder."
     }
-    $script:CMakePresetsPath = Join-Path -Path $CMakeRoot -ChildPath 'CMakePresets.json'
-    Write-Verbose "Presets = $CMakePresetsPath"
-    Get-Content $CMakePresetsPath | ConvertFrom-Json
+
+    $CMakeRoot = [System.IO.Path]::GetDirectoryName($CMakePresetsPath)
+    $CMakePresetsJson = $null
+
+    Write-Verbose "Presets = $CMakeRoot"
+
+    # If files were included, load them now and merge them in. Keep track of files that were included to avoid cycles.
+    $IncludedFiles = [System.Collections.Generic.HashSet[string]]::new()
+    [array] $IncludePaths = @(
+        $CMakePresetsPath
+        if ([System.IO.Path]::GetFileName($CMakePresetsPath) -ieq 'CMakeUserPresets.json') {
+            Join-Path -Path $CMakeRoot -ChildPath 'CMakePresets.json'
+        }
+    )
+
+    for (; ; ) {
+        $IncludePath, $IncludePaths = $IncludePaths
+        if (-not $IncludePath) {
+            break
+        }
+
+        Write-Verbose "Processing CMakePresets: $IncludePath"
+
+        $IncludeJson = Get-Content $IncludePath | ConvertFrom-Json
+        if (-not $CMakePresetsJson) {
+            $CMakePresetsJson = $IncludeJson
+        } else {
+            $CMakePresetsJson.buildPresets += Get-MemberValue -InputObject $IncludeJson -Name 'buildPresets' -Or @()
+            $CMakePresetsJson.configurePresets += Get-MemberValue -InputObject $IncludeJson -Name 'configurePresets' -Or @()
+        }
+
+        $NestedIncludePaths = Get-MemberValue -InputObject $IncludeJson -Name 'include' -Or @()
+        $IncludeRoot = [System.IO.Path]::GetDirectoryName($IncludePath)
+        foreach ($NestedIncludePath in $NestedIncludePaths) {
+            # Macro substiution for include paths
+            $NestedIncludePath = MacroReplacement $NestedIncludePath $null
+
+            if (-not [System.IO.Path]::IsPathFullyQualified($NestedIncludePath)) {
+                $NestedIncludePath = Join-Path -Path $IncludeRoot -ChildPath $NestedIncludePath
+            }
+
+            if (-not (Test-Path -Path $NestedIncludePath -PathType Leaf)) {
+                Write-Error "Included CMake presets file '$NestedIncludePath' not found."
+            }
+
+            if ($IncludedFiles.Contains($NestedIncludePath)) {
+                Write-Error "Cyclic include detected for included CMake presets file '$NestedIncludePath'."
+            }
+
+            $IncludedFiles.Add($NestedIncludePath) | Out-Null
+            $IncludePaths = $NestedIncludePath
+        }
+    }
+
+    $CMakePresetsJson
 }
 
 <#
     .Synopsis
-    Gets names of the 'buildPresets' in the specified CMakePresets.json object.
+    Gets 'buildPresets' in the specified CMakePresets.json object.
 #>
-function GetBuildPresetNames {
+function GetBuildPresets {
     param(
         $CMakePresetsJson
     )
@@ -101,15 +163,43 @@ function GetBuildPresetNames {
             $null -ne $ConfigurePresetJson
         }
 
-        $Presets.name
+        $Presets
     }
 }
 
 <#
     .Synopsis
-    Gets names of the 'configurePresets' in the specified CMakePresets.json object.
+    Gets the build presets matching the given name(s). If no name is given, returns the first available preset.
+    Writes an error if a named preset cannot be found.
 #>
-function GetConfigurePresetNames {
+function GetMatchingBuildPresets {
+    param(
+        $CMakePresetsJson,
+        $Preset
+    )
+    $BuildPresets = GetBuildPresets $CMakePresetsJson
+    if (-not $Preset) {
+        if (-not $BuildPresets) {
+            Write-Error "No Presets values specified, and one could not be inferred."
+        }
+        $BuildPresets | Select-Object -First 1
+    } else {
+        foreach ($CandidatePresetName in $Preset) {
+            $MatchingPresets = $BuildPresets |
+                Where-Object { ($_.name -like $CandidatePresetName) -or ($_.name -eq $CandidatePresetName) }
+            if (-not $MatchingPresets) {
+                Write-Error "Unable to find build preset '$CandidatePresetName' in $script:CMakePresetsPath"
+            }
+            $MatchingPresets
+        }
+    }
+}
+
+<#
+    .Synopsis
+    Gets the 'configurePresets' in the specified CMakePresets.json object.
+#>
+function GetConfigurePresets {
     param(
         $CMakePresetsJson
     )
@@ -124,7 +214,7 @@ function GetConfigurePresetNames {
         $Presets = $Presets |
             Where-Object { EvaluatePresetCondition $_ $CMakePresetsJson.configurePresets }
 
-        $Presets.name
+        $Presets
     }
 }
 
@@ -149,26 +239,16 @@ function GetCMake {
     $CMake
 }
 
-function ResolvePresets {
+<#
+    .Synopsis
+    Returns the configure preset referenced by the given build preset's 'configurePreset' field.
+#>
+function GetConfigurePresetFor {
     param(
         $CMakePresetsJson,
-
-        [ValidateSet('buildPresets', 'testPresets')]
-        $PresetType,
-
-        $PresetName
+        $Preset
     )
-    $PresetJson = $CMakePresetsJson.$PresetType | Where-Object { $_.name -eq $PresetName }
-    if (-not $PresetJson) {
-        Write-Error "Unable to find $PresetType '$Preset' in $(GetCMakePresetsPath)"
-    }
-
-    $ConfigurePresetJson = $CMakePresetsJson.configurePresets | Where-Object { $_.name -eq $PresetJson.configurePreset }
-    if (-not $ConfigurePresetJson) {
-        Write-Error "Unable to find configure preset '$($PresetJson.configurePreset)' in $(GetCMakePresetsPath)"
-    }
-
-    $PresetJson, $ConfigurePresetJson
+    $CMakePresetsJson.configurePresets | Where-Object { $_.name -eq $Preset.configurePreset }
 }
 
 <#
@@ -180,6 +260,10 @@ function ResolvePresets {
 
     .Parameter Presets
     The collection of presets to search for 'inherit' references.
+
+    .Parameter Action
+    A script block invoked for each preset in breadth-first order. Return $null to continue the walk; return
+    any non-$null value to stop and return that value to the caller.
 
     .Description
     The action should return $null to continue searching, or a non-$null value to stop searching and return that value.
@@ -211,6 +295,10 @@ function SearchAncestors {
     }
 }
 
+<#
+    .Synopsis
+    Walks the preset inheritance chain to find the first ancestor that defines the given property, and returns its value.
+#>
 function ResolvePresetProperty {
     param(
         $Preset,
@@ -223,22 +311,38 @@ function ResolvePresetProperty {
     }
 }
 
+<#
+    .Synopsis
+    Walks the preset inheritance chain to find the first ancestor that defines a 'condition' property, evaluates it, and returns the result. If no condition is found, returns $true.
+#>
 function EvaluatePresetCondition {
     param(
         $Preset,
         $Presets
     )
-    $Result = SearchAncestors -Preset $Preset -Presets $Presets {
+    $Scope = @{ Result = $null }
+    SearchAncestors -Preset $Preset -Presets $Presets {
         param($CurrentPreset)
-        $PresetConditionJson = Get-MemberValue $CurrentPreset 'condition'
-        if (($PresetConditionJson) -and
-            (-not (EvaluateCondition $PresetConditionJson $CurrentPreset))) {
-            return $false
+        $ConditionJson = Get-MemberValue $CurrentPreset 'condition'
+        if ($ConditionJson) {
+            if ($null -eq $Scope.Result) {
+                $Scope.Result = EvaluateCondition $ConditionJson $CurrentPreset
+            } else {
+                Write-Verbose "Preset '$($Preset.name)': condition on '$($CurrentPreset.name)' ignored (not the first condition in the inheritance chain)."
+            }
         }
     }
-    $Result -ne $false
+    if ($null -eq $Scope.Result) {
+        return $true
+    }
+    $Scope.Result
 }
 
+<#
+    .Synopsis
+    Evaluates a single CMake preset condition JSON object against the given preset's macro context.
+    Supports: equals, notEquals, inList, notInList, matches, notMatches, anyOf, allOf, not.
+#>
 function EvaluateCondition {
     param(
         $ConditionJson,
@@ -301,6 +405,11 @@ function EvaluateCondition {
     }
 }
 
+<#
+    .Synopsis
+    Resolves and returns the fully-qualified binary directory for the given configure preset, after performing
+    CMake macro substitution on the preset's 'binaryDir' value.
+#>
 function GetBinaryDirectory {
     param(
         $CMakePresetsJson,
@@ -315,6 +424,10 @@ function GetBinaryDirectory {
     [System.IO.Path]::GetFullPath($Result)
 }
 
+<#
+    .Synopsis
+    Returns the table of fixed CMake macro values that do not depend on a specific preset (e.g. ${hostSystemName}).
+#>
 function GetMacroConstants {
     $HostSystemName = if ($IsWindows) {
         'Windows'
@@ -332,6 +445,11 @@ function GetMacroConstants {
     }
 }
 
+<#
+    .Synopsis
+    Performs CMake preset macro substitution on the given string, expanding tokens such as ${sourceDir},
+    ${presetName}, ${hostSystemName}, $env{VAR}, $penv{VAR}, and $vendor{...}.
+#>
 function MacroReplacement {
     param(
         $Value,
@@ -354,7 +472,9 @@ function MacroReplacement {
                 break
             }
             '\$\{presetName\}' {
-                $PresetJson.name
+                if ($PresetJson) {
+                    $PresetJson.name
+                }
                 break
             }
             '\$\{generator\}' {
@@ -392,6 +512,11 @@ function MacroReplacement {
     $Result -join ''
 }
 
+<#
+    .Synopsis
+    Creates the CMake File API query files in the binary directory so that the next cmake configure writes
+    code-model, cache, cmakeFiles, and toolchain reply JSON into '.cmake/api/v1/reply/'.
+#>
 function Enable-CMakeBuildQuery {
     [CmdletBinding()]
     param(
@@ -418,8 +543,8 @@ function FilterExecutableTargets {
     )
     $TargetJsons = $TargetTuplesCodeModel |
         ForEach-Object {
-            Join-Path -Path $CodeModelDirectory -ChildPath $_.jsonFile |
-                Get-Item |
+            $JsonPath = Join-Path -Path $CodeModelDirectory -ChildPath $_.jsonFile
+            Get-Item -LiteralPath $JsonPath |
                 Get-Content |
                 ConvertFrom-Json
             }
@@ -430,6 +555,10 @@ function FilterExecutableTargets {
         }
 }
 
+<#
+    .Synopsis
+    Returns the path to the CMake File API reply directory ('.cmake/api/v1/reply') inside the binary directory.
+#>
 function Get-CMakeBuildCodeModelDirectory {
     param(
         [string] $BinaryDirectory
@@ -450,10 +579,8 @@ function Get-CMakeBuildCodeModel {
     )
 
     # Since BinaryDirectory may contain characters that are valid for the file-system, but are used by PowerShell's
-    # wildcard syntax (i.e. '[' and ']'), escape the characters before passing to Get-ChildItem.
-    $EscapedBinaryDirectory = $BinaryDirectory.Replace('[', '`[').Replace(']', '`]')
-
-    Get-ChildItem -Path (Get-CMakeBuildCodeModelDirectory $EscapedBinaryDirectory) -File -Filter 'codemodel-v2-*' -ErrorAction SilentlyContinue |
+    # wildcard syntax (i.e. '[' and ']'), specify it as the LiteralPath to Get-ChildItem
+    Get-ChildItem -LiteralPath (Get-CMakeBuildCodeModelDirectory $BinaryDirectory) -File -Filter 'codemodel-v2-*' -ErrorAction SilentlyContinue |
         Select-Object -First 1 |
         Get-Content |
         ConvertFrom-Json
@@ -508,7 +635,7 @@ function GetScopedTargets {
     $SourceDir = $CodeModel.paths.source
     $CodeModelConfiguration.targets |
         Where-Object {
-            $Folder = $CodeModelConfiguration.directories[$_.directoryIndex].build
+            $Folder = $CodeModelConfiguration.directories[$_.directoryIndex].source
             $Folder = if ($Folder -eq '.') {
                 $SourceDir
             } else {
@@ -519,6 +646,29 @@ function GetScopedTargets {
         }
 }
 
+<#
+    .Synopsis
+    Gets the value of a CMake cache entry.
+#>
+function GetCacheValue {
+    param(
+        [string] $BinaryDirectory,
+        [string] $CacheEntryName
+    )
+    $CMakeCacheFile = Join-Path -Path $BinaryDirectory -ChildPath 'CMakeCache.txt'
+    if (Test-Path -LiteralPath $CMakeCacheFile) {
+        Get-Content -LiteralPath $CMakeCacheFile |
+            Select-String "^$($CacheEntryName):.*=" |
+            ForEach-Object {
+                $_.ToString().Split('=', 2) | Select-Object -Last 1
+        }
+    }
+}
+
+<#
+    .Synopsis
+    Writes the CMake target dependency graph in Graphviz DOT format to the pipeline.
+#>
 function WriteDot {
     param (
         $Configuration,
@@ -541,6 +691,10 @@ function WriteDot {
     "}"
 }
 
+<#
+    .Synopsis
+    Writes the CMake target dependency graph in Visual Studio DGML format to the pipeline.
+#>
 function WriteDgml {
     param (
         $Configuration,

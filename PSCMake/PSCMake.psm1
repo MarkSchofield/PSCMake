@@ -28,6 +28,7 @@ $ErrorActionPreference = 'Stop'
 
 . $PSScriptRoot/Common/CMake.ps1
 . $PSScriptRoot/Common/Common.ps1
+. $PSScriptRoot/Common/Includes.ps1
 . $PSScriptRoot/Common/Ninja.ps1
 
 <#
@@ -63,7 +64,9 @@ function BuildPresetsCompleter {
     $null = $CommandAst
     $null = $FakeBoundParameters
     $CMakePresetsJson = GetCMakePresets -Silent
-    GetBuildPresetNames $CMakePresetsJson | Where-Object { $_ -ilike "$WordToComplete*" }
+    GetBuildPresets $CMakePresetsJson |
+        Select-Object -ExpandProperty 'name' |
+        Where-Object { $_ -ilike "$WordToComplete*" }
 }
 
 <#
@@ -112,10 +115,9 @@ function BuildTargetsCompleter {
     $null = $ParameterName
     $null = $CommandAst
     $CMakePresetsJson = GetCMakePresets -Silent
-    $PresetNames = GetBuildPresetNames $CMakePresetsJson
-    $PresetName = $FakeBoundParameters['Preset'] ?? $PresetNames |
+    $BuildPreset = GetMatchingBuildPresets $CMakePresetsJson $FakeBoundParameters['Preset'] |
         Select-Object -First 1
-    $BuildPreset, $ConfigurePreset = ResolvePresets $CMakePresetsJson 'buildPresets' $PresetName
+    $ConfigurePreset = GetConfigurePresetFor $CMakePresetsJson $BuildPreset
     $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
     $CMakeCodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
 
@@ -159,10 +161,9 @@ function ExecutableTargetsCompleter {
     $null = $ParameterName
     $null = $CommandAst
     $CMakePresetsJson = GetCMakePresets -Silent
-    $PresetNames = GetBuildPresetNames $CMakePresetsJson
-    $PresetName = $FakeBoundParameters['Presets'] ?? $PresetNames |
+    $BuildPreset = GetMatchingBuildPresets $CMakePresetsJson $FakeBoundParameters['Preset'] |
         Select-Object -First 1
-    $BuildPreset, $ConfigurePreset = ResolvePresets $CMakePresetsJson 'buildPresets' $PresetName
+    $ConfigurePreset = GetConfigurePresetFor $CMakePresetsJson $BuildPreset
     $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
     $CMakeCodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
 
@@ -197,9 +198,16 @@ function ConfigurePresetsCompleter {
     $null = $CommandAst
     $null = $FakeBoundParameters
     $CMakePresetsJson = GetCMakePresets -Silent
-    GetConfigurePresetNames $CMakePresetsJson | Where-Object { $_ -ilike "$WordToComplete*" }
+    GetConfigurePresets $CMakePresetsJson |
+        Select-Object -ExpandProperty 'name' |
+        Where-Object { $_ -ilike "$WordToComplete*" }
 }
 
+<#
+    .Synopsis
+    Runs cmake --preset for the given configure preset. Enables the File API query before invoking CMake so the
+    code-model reply is written into the binary directory on completion.
+#>
 function ConfigureCMake {
     param(
         [Parameter()]
@@ -211,7 +219,9 @@ function ConfigureCMake {
         [Parameter()]
         $ConfigurePreset,
 
-        [switch] $Fresh
+        [switch] $Fresh,
+
+        [string[]] $Arguments = @()
     )
     $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
     Enable-CMakeBuildQuery $BinaryDirectory
@@ -224,6 +234,7 @@ function ConfigureCMake {
         if ($VerbosePreference) {
             '--log-level=VERBOSE'
         }
+        $Arguments
     )
 
     InvokeExecutable $CMake $CMakeArguments
@@ -245,6 +256,9 @@ function ConfigureCMake {
     .Parameter Fresh
     A switch specifying whether a 'fresh' configuration is performed - removing any existing cache.
 
+    .Parameter Arguments
+    Additional arguments passed directly to the CMake configure invocation.
+
     .Example
     # Configure the 'windows-x64' and 'windows-x86' CMake builds.
     Configure-CMakeBuild -Preset windows-x64,windows-x86
@@ -258,31 +272,33 @@ function Configure-CMakeBuild {
         [string[]] $Preset,
 
         [Parameter()]
-        [switch] $Fresh
+        [switch] $Fresh,
+
+        [Parameter()]
+        [string[]] $Arguments = @()
     )
     $CMakeRoot = FindCMakeRoot
     $CMakePresetsJson = GetCMakePresets
-    $ConfigurePresetNames = GetConfigurePresetNames $CMakePresetsJson
-    $ConfigurePresetNames = if (-not $Preset) {
-        $ConfigurePresetNames | Select-Object -First 1
+    $ConfigurePresets = GetConfigurePresets $CMakePresetsJson
+    $ConfigurePresets = if (-not $Preset) {
+        $ConfigurePresets | Select-Object -First 1
     } else {
-        foreach ($CandidatePreset in $Preset) {
-            $ExpandedPresets = $ConfigurePresetNames | Where-Object { $_ -like $CandidatePreset }
-            $ExpandedPresets ?? $CandidatePreset
+        foreach ($CandidatePresetName in $Preset) {
+            $MatchingPresets = $ConfigurePresets |
+                Where-Object { ($_.name -like $CandidatePresetName) -or ($_.name -eq $CandidatePresetName) }
+            if (-not $MatchingPresets) {
+                Write-Error "Unable to find configuration preset '$CandidatePresetName' in $script:CMakePresetsPath"
+            }
+            $MatchingPresets
         }
     }
 
     $CMake = GetCMake
     Using-Location $CMakeRoot {
-        foreach ($ConfigurePresetName in $ConfigurePresetNames) {
-            Write-Output "Preset         : $ConfigurePresetName"
+        foreach ($ConfigurePreset in $ConfigurePresets) {
+            Write-Output "Preset         : $($ConfigurePreset.name)"
 
-            $ConfigurePreset = $CMakePresetsJson.configurePresets | Where-Object { $_.name -eq $ConfigurePresetName }
-            if (-not $ConfigurePreset) {
-                Write-Error "Unable to find configuration preset '$ConfigurePresetName' in $script:CMakePresetsPath"
-            }
-
-            ConfigureCMake -CMake $CMake $CMakePresetsJson $ConfigurePreset -Fresh:$Fresh
+            ConfigureCMake -CMake $CMake $CMakePresetsJson $ConfigurePreset -Fresh:$Fresh -Arguments:$Arguments
         }
     }
 }
@@ -297,9 +313,13 @@ function Configure-CMakeBuild {
     .Parameter Preset
 
     .Parameter Configuration
+    The CMake configuration name (e.g. 'Release', 'Debug') to build. Supports wildcards. If none is specified
+    all configurations are built.
 
     .Parameter Target
-    One or more
+    One or more CMake target names to build. Supports wildcards. If none is specified the default targets are
+    built, or - when the current directory is a subfolder of the CMake root - the targets whose source
+    directory falls under the current directory.
 
     .Parameter Configure
     A switch specifying whether the necessary configuration should be performed before the build is run.
@@ -309,6 +329,9 @@ function Configure-CMakeBuild {
 
     .Parameter Fresh
     A switch specifying whether a 'fresh' configuration should be performed before the build is run.
+
+    .Parameter Arguments
+    Additional arguments passed directly to the CMake build invocation.
 
     .Example
     # Build the 'windows-x64' and 'windows-x86' CMake builds.
@@ -345,22 +368,16 @@ function Build-CMakeBuild {
         [switch] $Report,
 
         [Parameter()]
-        [switch] $Fresh
+        [switch] $Fresh,
+
+        [Parameter()]
+        [string[]] $Arguments = @()
     )
     $CMakeRoot = FindCMakeRoot
     $CMakePresetsJson = GetCMakePresets
-    $BuildPresetNames = GetBuildPresetNames $CMakePresetsJson
-    $BuildPresetNames = if (-not $Preset) {
-        if (-not $BuildPresetNames) {
-            Write-Error "No Presets values specified, and one could not be inferred."
-        }
-        $BuildPresetNames | Select-Object -First 1
-    } else {
-        foreach ($CandidatePreset in $Preset) {
-            $ExpandedPresets = $BuildPresetNames | Where-Object { $_ -like $CandidatePreset }
-            $ExpandedPresets ?? $CandidatePreset
-        }
-    }
+    $BuildPresets = GetMatchingBuildPresets $CMakePresetsJson $Preset
+
+    Write-Verbose "Arguments: $Arguments"
 
     # If;
     #   * no targets were specified, and
@@ -370,10 +387,10 @@ function Build-CMakeBuild {
     $ScopeLocation = (Get-Location).Path
     $CMake = GetCMake
     Using-Location $CMakeRoot {
-        foreach ($BuildPresetName in $BuildPresetNames) {
-            Write-Output "Preset         : $BuildPresetName"
+        foreach ($BuildPreset in $BuildPresets) {
+            Write-Output "Preset         : $($BuildPreset.name)"
 
-            $BuildPreset, $ConfigurePreset = ResolvePresets $CMakePresetsJson 'buildPresets' $BuildPresetName
+            $ConfigurePreset = GetConfigurePresetFor $CMakePresetsJson $BuildPreset
             $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
             $CMakeCacheFile = Join-Path -Path $BinaryDirectory -ChildPath 'CMakeCache.txt'
 
@@ -385,8 +402,8 @@ function Build-CMakeBuild {
             #  5) "Get-CMakeBuildCodeModel" returns $null
             if ($Configure -or
                 $Fresh -or
-                (-not (Test-Path -Path $CMakeCacheFile -PathType Leaf)) -or
-                (-not (Test-Path -Path (Get-CMakeBuildCodeModelDirectory $BinaryDirectory) -PathType Container)) -or
+                (-not (Test-Path -LiteralPath $CMakeCacheFile -PathType Leaf)) -or
+                (-not (Test-Path -LiteralPath (Get-CMakeBuildCodeModelDirectory $BinaryDirectory) -PathType Container)) -or
                 (-not ($CodeModel = Get-CMakeBuildCodeModel $BinaryDirectory))
                 ) {
                 ConfigureCMake -CMake $CMake $CMakePresetsJson $ConfigurePreset -Fresh:$Fresh
@@ -415,7 +432,7 @@ function Build-CMakeBuild {
 
                 $CMakeArguments = @(
                     '--build'
-                    '--preset', $BuildPresetName
+                    '--preset', $BuildPreset.name
                     if ($ConfigurationName) {
                         '--config', $ConfigurationName
                     }
@@ -424,6 +441,10 @@ function Build-CMakeBuild {
                         $TargetNames
                     }
                 )
+
+                # Add extra arguments to the CMake build invocation.
+                $CMakeArguments += $Arguments
+                Write-Verbose "CMake Arguments: $CMakeArguments"
 
                 $StartTime = [datetime]::Now
                 InvokeExecutable $CMake $CMakeArguments
@@ -439,6 +460,31 @@ function Build-CMakeBuild {
     }
 }
 
+<#
+    .Synopsis
+    Writes a dependency graph of a CMake build.
+
+    .Description
+    Reads the CMake File API code-model for the given preset and emits a dependency graph of all CMake targets
+    and their link dependencies in the requested format.
+
+    .Parameter Preset
+    The CMake build preset to graph. If none is specified the first available build preset is used.
+
+    .Parameter Configuration
+    The CMake configuration to graph (e.g. 'Debug', 'Release'). Defaults to 'Debug'.
+
+    .Parameter As
+    The output format: 'dot' (Graphviz DOT language) or 'dgml' (Visual Studio DGML). Defaults to 'dot'.
+
+    .Example
+    # Write a DOT graph for the 'windows-x64' build preset.
+    Write-CMakeBuild -Preset windows-x64 | Out-File deps.dot
+
+    .Example
+    # Write a DGML graph for the 'windows-x64' build preset and open it in Visual Studio.
+    Write-CMakeBuild -Preset windows-x64 -As dgml | Out-File deps.dgml
+#>
 function Write-CMakeBuild {
     param(
         [Parameter(Position = 0)]
@@ -451,17 +497,9 @@ function Write-CMakeBuild {
         [string] $As = 'dot'
     )
     $CMakePresetsJson = GetCMakePresets
-    $PresetNames = GetBuildPresetNames $CMakePresetsJson
-
-    if (-not $Preset) {
-        if (-not $PresetNames) {
-            Write-Error "No Preset values specified, and one could not be inferred."
-        }
-        $Preset = $PresetNames | Select-Object -First 1
-        Write-Information "No preset specified, defaulting to: $Preset"
-    }
-
-    $BuildPreset, $ConfigurePreset = ResolvePresets $CMakePresetsJson 'buildPresets' $Preset
+    $BuildPreset = GetMatchingBuildPresets $CMakePresetsJson $Preset |
+        Select-Object -First 1
+    $ConfigurePreset = GetConfigurePresetFor $CMakePresetsJson $BuildPreset
     $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
     $CodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
     $CodeModelDirectory = Get-CMakeBuildCodeModelDirectory $BinaryDirectory
@@ -521,16 +559,9 @@ function Invoke-CMakeOutput {
         [string[]] $Arguments
     )
     $CMakePresetsJson = GetCMakePresets
-    $PresetNames = GetBuildPresetNames $CMakePresetsJson
-
-    if (-not $Preset) {
-        if (-not $PresetNames) {
-            Write-Error "No Presets values specified, and one could not be inferred."
-        }
-        $Preset = $PresetNames | Select-Object -First 1
-    }
-
-    $BuildPreset, $ConfigurePreset = ResolvePresets $CMakePresetsJson 'buildPresets' $Preset
+    $BuildPreset = GetMatchingBuildPresets $CMakePresetsJson $Preset |
+        Select-Object -First 1
+    $ConfigurePreset = GetConfigurePresetFor $CMakePresetsJson $BuildPreset
     $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
 
     # Find the 'code model' for the preset. If no code model is found, configure the build and try again.
@@ -582,6 +613,191 @@ function Invoke-CMakeOutput {
     InvokeExecutable $TargetPath $Arguments
 }
 
+<#
+    .Synopsis
+    Recompiles a single source file and returns the include tree captured by the compiler.
+
+    .Description
+    `Get-CMakeInclude` recompiles the given source file with include reporting enabled (/showIncludes for MSVC,
+    -H for Clang) and returns the include tree as a flat list of objects with Depth and Path properties. The
+    compile flags, include paths, and defines are read from the CMake File API code model for the given preset
+    and configuration, so no manual compiler invocation is needed.
+
+    Supported compilers: MSVC, Clang, AppleClang.
+
+    .Parameter Preset
+    The CMake build preset to use. If none is specified, the first available build preset is used.
+
+    .Parameter Configuration
+    The CMake configuration (e.g. 'Debug', 'Release'). If none is specified, the first available configuration
+    in the code model is used.
+
+    .Parameter SourceFile
+    Path to the C++ source file to analyze. May be absolute or relative to the current directory.
+
+    .Example
+    # Show all headers included when compiling MyFile.cpp for the windows-x64 preset.
+    Get-CMakeInclude -Preset windows-x64 -Configuration Debug -SourceFile src/MyFile.cpp
+
+    .Example
+    # Find the deepest include chains for a file.
+    Get-CMakeInclude windows-x64 Debug src/MyFile.cpp | Sort-Object Depth -Descending | Select-Object -First 10
+#>
+function Get-CMakeInclude {
+    [CmdletBinding()]
+    param(
+        [Parameter(Position = 0)]
+        [string] $Preset,
+
+        [Parameter(Position = 1)]
+        [string] $Configuration,
+
+        [Parameter(Mandatory, Position = 2)]
+        [string] $SourceFile,
+
+        [Parameter()]
+        [switch] $IncludePchHeaders
+    )
+    $CMakePresetsJson = GetCMakePresets
+    $BuildPreset = GetMatchingBuildPresets $CMakePresetsJson $Preset | Select-Object -First 1
+    $ConfigurePreset = GetConfigurePresetFor $CMakePresetsJson $BuildPreset
+    $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
+
+    $CodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
+    if (-not $CodeModel) {
+        Write-Error "No code model found in '$BinaryDirectory'. Run Configure-CMakeBuild first."
+    }
+
+    $Toolchains = Get-CMakeBuildToolchain $BinaryDirectory
+    if (-not $Toolchains) {
+        Write-Error "No toolchain information found in '$BinaryDirectory'. Run Configure-CMakeBuild first."
+    }
+
+    $SourceFilePath = (Resolve-Path -LiteralPath $SourceFile).Path
+    $Invocation = GetCompilerInvocationForSource $CodeModel $Toolchains $BinaryDirectory $Configuration $SourceFilePath
+    if (-not $Invocation) {
+        Write-Error "Source file '$SourceFile' was not found in any target's source list."
+    }
+
+    $CompilerArgs = $Invocation.CompilerArgs
+
+    if (($Invocation.CompilerId -eq 'MSVC') -and ($IncludePchHeaders)) {
+        $CompilerArgs = $CompilerArgs | Where-Object { $_ -notlike '/Yu*' }
+    }
+
+    if ($Invocation.CompilerId -eq 'MSVC') {
+        $CompilerArgs += @('/showIncludes', '/nologo', '/c', $SourceFilePath, '/Zs')
+    } else {
+        $CompilerArgs += @('-H', '-c', $SourceFilePath, '-fsyntax-only')
+    }
+
+    Write-Verbose "Get-CMakeInclude: Compiler ID: $($Invocation.CompilerId)"
+    Write-Verbose "Get-CMakeInclude: Compiler : $($Invocation.CompilerPath)"
+    Write-Verbose "Get-CMakeInclude: Arguments: $($CompilerArgs -join ' ')"
+
+    $Output = Using-Location $Invocation.BuildDir {
+        InvokeExecutable $Invocation.CompilerPath $CompilerArgs 2>&1
+    }
+
+    if ((Test-Path variable:LASTEXITCODE) -and ($LASTEXITCODE -ne 0)) {
+        Write-Warning "Get-CMakeInclude: Compiler exited with code $LASTEXITCODE. Include information may be incomplete."
+    }
+
+    if ($Invocation.CompilerId -eq 'MSVC') {
+        ParseMSVCIncludes $Output
+    } else {
+        ParseClangIncludes $Output
+    }
+}
+
+<#
+    .Synopsis
+    Recompiles a single source file and returns the preprocessed output.
+
+    .Description
+    `Get-CMakePreprocess` recompiles the given source file in preprocessing mode (/E for MSVC, -E for Clang)
+    and returns the preprocessed source as a flat list of strings. The compile flags, include paths, and
+    defines are read from the CMake File API code model for the given preset and configuration, so no manual
+    compiler invocation is needed.
+
+    Supported compilers: MSVC, Clang, AppleClang.
+
+    .Parameter Preset
+    The CMake build preset to use. If none is specified, the first available build preset is used.
+
+    .Parameter Configuration
+    The CMake configuration (e.g. 'Debug', 'Release'). If none is specified, the first available configuration
+    in the code model is used.
+
+    .Parameter SourceFile
+    Path to the C++ source file to preprocess. May be absolute or relative to the current directory.
+
+    .Example
+    # Preprocess MyFile.cpp and write the output to a file.
+    Get-CMakePreprocess -Preset windows-x64 -Configuration Debug -SourceFile src/MyFile.cpp | Set-Content MyFile.i
+
+    .Example
+    # Count the lines in the preprocessed output.
+    (Get-CMakePreprocess windows-x64 Debug src/MyFile.cpp).Count
+#>
+function Get-CMakePreprocess {
+    [CmdletBinding()]
+    param(
+        [Parameter(Position = 0)]
+        [string] $Preset,
+
+        [Parameter(Position = 1)]
+        [string] $Configuration,
+
+        [Parameter(Mandatory, Position = 2)]
+        [string] $SourceFile
+    )
+    $CMakePresetsJson = GetCMakePresets
+    $BuildPreset = GetMatchingBuildPresets $CMakePresetsJson $Preset | Select-Object -First 1
+    $ConfigurePreset = GetConfigurePresetFor $CMakePresetsJson $BuildPreset
+    $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
+
+    $CodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
+    if (-not $CodeModel) {
+        Write-Error "No code model found in '$BinaryDirectory'. Run Configure-CMakeBuild first."
+    }
+
+    $Toolchains = Get-CMakeBuildToolchain $BinaryDirectory
+    if (-not $Toolchains) {
+        Write-Error "No toolchain information found in '$BinaryDirectory'. Run Configure-CMakeBuild first."
+    }
+
+    $SourceFilePath = (Resolve-Path -LiteralPath $SourceFile).Path
+    $Invocation = GetCompilerInvocationForSource $CodeModel $Toolchains $BinaryDirectory $Configuration $SourceFilePath
+    if (-not $Invocation) {
+        Write-Error "Source file '$SourceFile' was not found in any target's source list."
+    }
+
+    $CompilerArgs = $Invocation.CompilerArgs
+    if ($Invocation.CompilerId -eq 'MSVC') {
+        $CompilerArgs += @('/nologo', '/E', $SourceFilePath)
+    } else {
+        $CompilerArgs += @('-E', $SourceFilePath)
+    }
+
+    Write-Verbose "Get-CMakePreprocess: Compiler ID: $($Invocation.CompilerId)"
+    Write-Verbose "Get-CMakePreprocess: Compiler : $($Invocation.CompilerPath)"
+    Write-Verbose "Get-CMakePreprocess: Arguments: $($CompilerArgs -join ' ')"
+
+    $Output = Using-Location $Invocation.BuildDir {
+        InvokeExecutable $Invocation.CompilerPath $CompilerArgs
+    }
+
+    if ((Test-Path variable:LASTEXITCODE) -and ($LASTEXITCODE -ne 0)) {
+        Write-Warning "Get-CMakePreprocess: Compiler exited with code $LASTEXITCODE. Output may be incomplete."
+    }
+
+    $Output
+}
+
+Register-ArgumentCompleter -CommandName Get-CMakePreprocess -ParameterName Preset -ScriptBlock $function:BuildPresetsCompleter
+Register-ArgumentCompleter -CommandName Get-CMakePreprocess -ParameterName Configuration -ScriptBlock $function:BuildConfigurationsCompleter
+
 Register-ArgumentCompleter -CommandName Invoke-CMakeOutput -ParameterName Preset -ScriptBlock $function:BuildPresetsCompleter
 Register-ArgumentCompleter -CommandName Invoke-CMakeOutput -ParameterName Configuration -ScriptBlock $function:BuildConfigurationsCompleter
 Register-ArgumentCompleter -CommandName Invoke-CMakeOutput -ParameterName Target -ScriptBlock $function:ExecutableTargetsCompleter
@@ -594,3 +810,6 @@ Register-ArgumentCompleter -CommandName Configure-CMakeBuild -ParameterName Pres
 
 Register-ArgumentCompleter -CommandName Write-CMakeBuild -ParameterName Preset -ScriptBlock $function:BuildPresetsCompleter
 Register-ArgumentCompleter -CommandName Write-CMakeBuild -ParameterName Configuration -ScriptBlock $function:BuildConfigurationsCompleter
+
+Register-ArgumentCompleter -CommandName Get-CMakeInclude -ParameterName Preset -ScriptBlock $function:BuildPresetsCompleter
+Register-ArgumentCompleter -CommandName Get-CMakeInclude -ParameterName Configuration -ScriptBlock $function:BuildConfigurationsCompleter
