@@ -26,8 +26,9 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-. $PSScriptRoot/Common/CMake.ps1
 . $PSScriptRoot/Common/Common.ps1
+. $PSScriptRoot/Common/CMake.ps1
+. $PSScriptRoot/Common/ClangTidy.ps1
 . $PSScriptRoot/Common/Includes.ps1
 . $PSScriptRoot/Common/Ninja.ps1
 
@@ -179,6 +180,31 @@ function ExecutableTargetsCompleter {
     # Use the 'code model' JSON to load the target-specific JSON to filter to targets with 'type' equal to 'EXECUTABLE'
     $TargetTuples = FilterExecutableTargets (Get-CMakeBuildCodeModelDirectory $BinaryDirectory) $TargetTuplesCodeModel
     $TargetTuples.name
+}
+
+<#
+    .Synopsis
+    An argument-completer for `Invoke-ClangTidy`'s `-Checks` parameter.
+
+    .Description
+    Runs `clang-tidy --list-checks --checks=*` to enumerate all available checks and filters them by
+    the current word being completed. Returns nothing silently if clang-tidy cannot be found.
+#>
+function ClangTidyChecksCompleter {
+    param(
+        $CommandName,
+        $ParameterName,
+        $WordToComplete,
+        $CommandAst,
+        $FakeBoundParameters
+    )
+    $null = $CommandName
+    $null = $ParameterName
+    $null = $CommandAst
+    $null = $FakeBoundParameters
+
+    GetClangTidyChecks |
+        Where-Object { $_ -and ($_ -ilike "$WordToComplete*") }
 }
 
 <#
@@ -795,6 +821,114 @@ function Get-CMakePreprocess {
     $Output
 }
 
+<#
+    .Synopsis
+    Runs clang-tidy against one or more source files using compilation flags derived from the CMake File API.
+
+    .Description
+    `Invoke-ClangTidy` resolves the compiler flags for each specified source file via the CMake File API code
+    model, writes a temporary compile_commands.json covering all of them, and invokes clang-tidy. The temporary
+    file is always removed when clang-tidy finishes.
+
+    .Parameter Preset
+    The CMake build preset to use. If none is specified, the first available build preset is used.
+
+    .Parameter Configuration
+    The CMake configuration (e.g. 'Debug', 'Release'). If none is specified, the first available configuration
+    in the code model is used.
+
+    .Parameter SourceFile
+    One or more C/C++ source files to analyze. Paths may be absolute or relative to the current directory.
+
+    .Parameter Checks
+    One or more clang-tidy check patterns (e.g. 'modernize-*', 'bugprone-*'). Multiple values are joined into
+    a comma-separated string and passed as --checks=<value>. If omitted, clang-tidy uses its default checks.
+
+    .Parameter Arguments
+    Additional arguments passed directly to clang-tidy (e.g. '--fix', '--warnings-as-errors=*').
+
+    .Example
+    # Run default checks on a single file.
+    Invoke-ClangTidy -Preset windows-x64 -Configuration Debug -SourceFile src/MyFile.cpp
+
+    .Example
+    # Run modernize and bugprone checks on multiple files.
+    Invoke-ClangTidy windows-x64 Debug -SourceFile src/A.cpp,src/B.cpp -Checks modernize-*,bugprone-*
+
+    .Example
+    # Auto-fix and treat all warnings as errors.
+    Invoke-ClangTidy windows-x64 Debug src/MyFile.cpp -Arguments '--fix','--warnings-as-errors=*'
+#>
+function Invoke-ClangTidy {
+    [CmdletBinding()]
+    param(
+        [Parameter(Position = 0)]
+        [string] $Preset,
+
+        [Parameter(Position = 1)]
+        [string] $Configuration,
+
+        [Parameter(Mandatory, Position = 2, ValueFromPipeline)]
+        [string[]] $SourceFile,
+
+        [Parameter()]
+        [string[]] $Checks,
+
+        [Parameter()]
+        [string[]] $Arguments = @()
+    )
+    $CMakePresetsJson = GetCMakePresets
+    $BuildPreset = GetMatchingBuildPresets $CMakePresetsJson $Preset | Select-Object -First 1
+    $ConfigurePreset = GetConfigurePresetFor $CMakePresetsJson $BuildPreset
+    $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
+
+    $CodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
+    if (-not $CodeModel) {
+        Write-Error "No code model found in '$BinaryDirectory'. Run Configure-CMakeBuild first."
+    }
+
+    $Toolchains = Get-CMakeBuildToolchain $BinaryDirectory
+    if (-not $Toolchains) {
+        Write-Error "No toolchain information found in '$BinaryDirectory'. Run Configure-CMakeBuild first."
+    }
+
+    $CompileCommandsEntries = @()
+    $ResolvedSourceFiles = @()
+    foreach ($File in $SourceFile) {
+        $SourceFilePath = (Resolve-Path -LiteralPath $File).Path
+        $Invocation = GetCompilerInvocationForSource $CodeModel $Toolchains $BinaryDirectory $Configuration $SourceFilePath
+        if (-not $Invocation) {
+            Write-Error "Source file '$File' was not found in any target's source list."
+        }
+        $CompileCommandsEntries += NewCompileCommandsEntryForSource $Invocation $SourceFilePath
+        $ResolvedSourceFiles += $SourceFilePath
+    }
+
+    $TempDir = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath "pscmake-clang-tidy-$(New-Guid)"
+    $null = New-Item -ItemType Directory -Path $TempDir -Force
+    try {
+        $CompileCommandsPath = Join-Path -Path $TempDir -ChildPath 'compile_commands.json'
+        $CompileCommandsEntries |
+            ConvertTo-Json -Depth 5 |
+            Set-Content -Path $CompileCommandsPath -Encoding utf8
+
+        $ClangTidy = GetClangTidy
+        $ClangTidyArgs = @(
+            '-p', $TempDir
+            if ($Checks) {
+                "--checks=$($Checks -join ',')"
+            }
+            $Arguments
+            $ResolvedSourceFiles
+        )
+
+        Write-Verbose "Invoke-ClangTidy: $ClangTidy $($ClangTidyArgs -join ' ')"
+        InvokeExecutable $ClangTidy $ClangTidyArgs
+    } finally {
+        Remove-Item -Recurse -Force -Path $TempDir -ErrorAction SilentlyContinue
+    }
+}
+
 Register-ArgumentCompleter -CommandName Get-CMakePreprocess -ParameterName Preset -ScriptBlock $function:BuildPresetsCompleter
 Register-ArgumentCompleter -CommandName Get-CMakePreprocess -ParameterName Configuration -ScriptBlock $function:BuildConfigurationsCompleter
 
@@ -813,3 +947,7 @@ Register-ArgumentCompleter -CommandName Write-CMakeBuild -ParameterName Configur
 
 Register-ArgumentCompleter -CommandName Get-CMakeInclude -ParameterName Preset -ScriptBlock $function:BuildPresetsCompleter
 Register-ArgumentCompleter -CommandName Get-CMakeInclude -ParameterName Configuration -ScriptBlock $function:BuildConfigurationsCompleter
+
+Register-ArgumentCompleter -CommandName Invoke-ClangTidy -ParameterName Preset -ScriptBlock $function:BuildPresetsCompleter
+Register-ArgumentCompleter -CommandName Invoke-ClangTidy -ParameterName Configuration -ScriptBlock $function:BuildConfigurationsCompleter
+Register-ArgumentCompleter -CommandName Invoke-ClangTidy -ParameterName Checks -ScriptBlock $function:ClangTidyChecksCompleter

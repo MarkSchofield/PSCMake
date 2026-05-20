@@ -158,6 +158,26 @@ function GetCompileInfoForSource {
 
 <#
     .Synopsis
+    Builds a single compile_commands.json entry for the given compiler invocation and source file.
+#>
+function NewCompileCommandsEntryForSource {
+    param(
+        $Invocation,
+        [string] $SourceFilePath
+    )
+    $Tokens = @($Invocation.CompilerPath) + $Invocation.CompilerArgs + @($SourceFilePath)
+    $Command = ($Tokens | ForEach-Object {
+        if ($_ -match '\s') { "`"$_`"" } else { $_ }
+    }) -join ' '
+    [PSCustomObject]@{
+        directory = $Invocation.BuildDir
+        command   = $Command
+        file      = $SourceFilePath
+    }
+}
+
+<#
+    .Synopsis
     Parses MSVC /showIncludes output lines into a flat list of include nodes with Depth and Path properties.
 
     MSVC format: "Note: including file: <N spaces><path>"

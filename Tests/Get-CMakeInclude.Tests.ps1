@@ -11,6 +11,53 @@ BeforeAll {
     $script:Props = GetReferenceBuildProperties
 }
 
+Describe 'NewCompileCommandsEntryForSource' {
+    It 'Returns an entry with directory, command, and file fields' {
+        $Invocation = [PSCustomObject]@{
+            CompilerPath = '/usr/bin/clang++'
+            CompilerArgs = @('-std=c++17', '-I/usr/include')
+            BuildDir     = '/build'
+        }
+        $Result = NewCompileCommandsEntryForSource $Invocation '/src/MyFile.cpp'
+        $Result.directory | Should -Be '/build'
+        $Result.file | Should -Be '/src/MyFile.cpp'
+        $Result.command | Should -Not -BeNullOrEmpty
+    }
+
+    It 'Includes the compiler path, args, and source file in the command' {
+        $Invocation = [PSCustomObject]@{
+            CompilerPath = '/usr/bin/clang++'
+            CompilerArgs = @('-std=c++17', '-I/usr/include')
+            BuildDir     = '/build'
+        }
+        $Result = NewCompileCommandsEntryForSource $Invocation '/src/MyFile.cpp'
+        $Result.command | Should -BeLike '/usr/bin/clang++*'
+        $Result.command | Should -BeLike '*-std=c++17*'
+        $Result.command | Should -BeLike '*-I/usr/include*'
+        $Result.command | Should -BeLike '*/src/MyFile.cpp'
+    }
+
+    It 'Quotes tokens that contain spaces' {
+        $Invocation = [PSCustomObject]@{
+            CompilerPath = 'C:\Program Files\LLVM\clang++.exe'
+            CompilerArgs = @('-std=c++17')
+            BuildDir     = 'C:\build'
+        }
+        $Result = NewCompileCommandsEntryForSource $Invocation 'C:\src\MyFile.cpp'
+        $Result.command | Should -BeLike '"C:\Program Files\LLVM\clang++.exe"*'
+    }
+
+    It 'Does not quote tokens without spaces' {
+        $Invocation = [PSCustomObject]@{
+            CompilerPath = '/usr/bin/clang++'
+            CompilerArgs = @('-std=c++17')
+            BuildDir     = '/build'
+        }
+        $Result = NewCompileCommandsEntryForSource $Invocation '/src/MyFile.cpp'
+        $Result.command | Should -Not -BeLike '"*"*'
+    }
+}
+
 Describe 'ParseMSVCIncludes' {
     It 'Parses a single depth-1 include' {
         $Result = ParseMSVCIncludes @('Note: including file: C:\Windows\include\windows.h')

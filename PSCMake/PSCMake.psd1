@@ -69,7 +69,7 @@ FormatsToProcess = @('PSCMake.Format.ps1xml')
 # NestedModules = @()
 
 # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
-FunctionsToExport = 'Build-CMakeBuild', 'Configure-CMakeBuild', 'Get-CMakeInclude', 'Get-CMakePreprocess', 'Write-CMakeBuild', 'Invoke-CMakeOutput'
+FunctionsToExport = 'Build-CMakeBuild', 'Configure-CMakeBuild', 'Get-CMakeInclude', 'Get-CMakePreprocess', 'Invoke-ClangTidy', 'Write-CMakeBuild', 'Invoke-CMakeOutput'
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
 CmdletsToExport = @()
