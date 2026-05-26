@@ -140,3 +140,15 @@ filter ToHashTable {
     process { $Result[$_.Name] = $_.Value }
     end { $Result }
 }
+
+function GetHomePath {
+    if ($IsWindows) {
+        $env:USERPROFILE
+    } elseif ($IsLinux) {
+        $env:HOME
+    } elseif ($IsMacOS) {
+        $env:HOME
+    } else {
+        Write-Error "Unsupported platform."
+    }
+}
