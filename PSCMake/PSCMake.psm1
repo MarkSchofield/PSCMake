@@ -635,6 +635,13 @@ function Invoke-CMakeOutput {
     .Parameter SourceFile
     Path to the C++ source file to analyze. May be absolute or relative to the current directory.
 
+    .Parameter IncludePchHeaders
+    Whether to include precompiled header files in the output (MSVC only). By default, #include directives from a
+    precompiled header are not reported.
+
+    .Parameter Raw
+    Whether to return the raw compiler output without any processing.
+
     .Example
     # Show all headers included when compiling MyFile.cpp for the windows-x64 preset.
     Get-CMakeInclude -Preset windows-x64 -Configuration Debug -SourceFile src/MyFile.cpp
@@ -656,7 +663,10 @@ function Get-CMakeInclude {
         [string] $SourceFile,
 
         [Parameter()]
-        [switch] $IncludePchHeaders
+        [switch] $IncludePchHeaders,
+
+        [Parameter()]
+        [switch] $Raw
     )
     $CMakePresetsJson = GetCMakePresets
     $BuildPreset = GetMatchingBuildPresets $CMakePresetsJson $Preset | Select-Object -First 1
@@ -703,10 +713,14 @@ function Get-CMakeInclude {
         Write-Warning "Get-CMakeInclude: Compiler exited with code $LASTEXITCODE. Include information may be incomplete."
     }
 
-    if ($Invocation.CompilerId -eq 'MSVC') {
-        ParseMSVCIncludes $Output
+    if ($Raw) {
+        $Output
     } else {
-        ParseClangIncludes $Output
+        if ($Invocation.CompilerId -eq 'MSVC') {
+            ParseMSVCIncludes $Output
+        } else {
+            ParseClangIncludes $Output
+        }
     }
 }
 
