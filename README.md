@@ -54,7 +54,8 @@ skipped when output is redirected or `NO_COLOR` is set.
 - `VisualStudio` needs a one-time `Register-PSCMakeIde`, which registers a `pscmake-vs://` handler (HKCU, no
   elevation) that drives a running Visual Studio. `Register-PSCMakeIde -Remove` undoes it.
 - Click links with Ctrl+click in Windows Terminal.
-- Formatting pipes the build output, so Ninja stops repainting its status line in place.
+- Formatting pipes the build output, so Ninja stops repainting its status line in place. PSCMake shows a
+  `Write-Progress` bar from Ninja's `[n/m]` step lines instead, and hides those lines unless `-Verbose` is given.
 
 Running `Build-CMakeBuild` by itself would run the first `buildConfiguration`. Run any command with `-?` to get more
 details.

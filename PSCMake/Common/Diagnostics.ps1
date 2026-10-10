@@ -279,22 +279,47 @@ function FormatDiagnosticLine {
 
     .Description
     Lines already containing escape sequences (e.g. clang's own `-fcolor-diagnostics`) pass through untouched.
+
+    Ninja prints a '[n/m] description' line per step when its output is piped. If -ProgressActivity is given, those
+    lines drive Write-Progress and are written to the verbose stream instead of the output. The caller is responsible
+    for the closing 'Write-Progress -Completed'.
 #>
 function WriteAugmentedOutput {
+    [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(ValueFromPipeline)]
         $InputObject,
 
         [string] $BaseDirectory,
         [string] $Ide,
-        [string] $Style = 'MSVC'
+        [string] $Style = 'MSVC',
+        [string] $ProgressActivity
     )
+    begin {
+        $Throttle = [System.Diagnostics.Stopwatch]::StartNew()
+    }
     process {
         $Line = [string] $InputObject
         if ($Line -and -not $Line.Contains("`e")) {
             $Diagnostic = ParseDiagnosticLine $Line -Style $Style
             if ($Diagnostic) {
                 return FormatDiagnosticLine -Line $Line -Diagnostic $Diagnostic -BaseDirectory $BaseDirectory -Ide $Ide
+            }
+
+            if ($ProgressActivity) {
+                $Step = [regex]::Match($Line, '^\[(?<n>\d+)/(?<m>\d+)\]\s+(?<what>.*)$')
+                if ($Step.Success) {
+                    Write-Verbose $Line
+                    # Repainting on every step of a large build costs more than it informs.
+                    if ($Throttle.ElapsedMilliseconds -ge 100) {
+                        $Throttle.Restart()
+                        $Total = [int] $Step.Groups['m'].Value
+                        $Done = [int] $Step.Groups['n'].Value
+                        Write-Progress -Activity $ProgressActivity -Status $Line -PercentComplete ([math]::Min(100, [int] (100 * $Done / [math]::Max(1, $Total))))
+                    }
+                    return
+                }
             }
         }
         $Line

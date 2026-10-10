@@ -526,9 +526,15 @@ function Build-CMakeBuild {
 
                 $StartTime = [datetime]::Now
                 if ($FormatDiagnostics) {
-                    # Piping stops Ninja repainting its in-place status line; opting out keeps the original behavior.
-                    InvokeExecutable $CMake $CMakeArguments 2>&1 |
-                        WriteAugmentedOutput -BaseDirectory (Resolve-Path -LiteralPath $BinaryDirectory).Path -Ide $DiagnosticIde -Style (GetDiagnosticStyle $BinaryDirectory)
+                    # Piping stops Ninja repainting its in-place status line, so its '[n/m]' step lines drive
+                    # Write-Progress instead. Opting out keeps the original behavior.
+                    $ProgressActivity = "Building $($BuildPreset.name) $ConfigurationName".TrimEnd()
+                    try {
+                        InvokeExecutable $CMake $CMakeArguments 2>&1 |
+                            WriteAugmentedOutput -BaseDirectory (Resolve-Path -LiteralPath $BinaryDirectory).Path -Ide $DiagnosticIde -Style (GetDiagnosticStyle $BinaryDirectory) -ProgressActivity $ProgressActivity
+                    } finally {
+                        Write-Progress -Activity $ProgressActivity -Completed
+                    }
                 } else {
                     InvokeExecutable $CMake $CMakeArguments
                 }

@@ -129,6 +129,22 @@ Describe 'WriteAugmentedOutput' {
     It 'Augments diagnostics' {
         ('file.cpp(1,1): error C1: x' | WriteAugmentedOutput).StartsWith("`e[38;2;") | Should -BeTrue
     }
+    It 'Hides Ninja step lines and reports progress when given an activity' {
+        Mock Write-Progress {}
+        # Repaints are throttled to one per 100ms, so the second step arrives after a delay.
+        $Out = '[1/4] Building CXX object a.obj', 'warn.txt', '[3/4] Linking CXX executable a.exe' |
+            ForEach-Object { if ($_ -like '`[3*') { Start-Sleep -Milliseconds 150 }; $_ } |
+            WriteAugmentedOutput -ProgressActivity 'Building'
+        $Out | Should -Be @('warn.txt')
+        Should -Invoke Write-Progress -Times 1 -ParameterFilter { $PercentComplete -eq 75 -and $Activity -eq 'Building' }
+    }
+    It 'Writes step lines to the verbose stream' {
+        $Out = '[1/4] Building CXX object a.obj' | WriteAugmentedOutput -ProgressActivity 'Building' -Verbose 4>&1
+        $Out.Message | Should -Be '[1/4] Building CXX object a.obj'
+    }
+    It 'Passes step lines through when there is no activity' {
+        '[1/4] Building CXX object a.obj' | WriteAugmentedOutput | Should -Be '[1/4] Building CXX object a.obj'
+    }
     It 'Emits nothing for no input' {
         @() | WriteAugmentedOutput | Should -BeNullOrEmpty
     }
