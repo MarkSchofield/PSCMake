@@ -75,7 +75,10 @@ FunctionsToExport = @(
     'Get-CMakeInclude'
     'Get-CMakePreprocess'
     'Get-CMakeTarget'
+    'Get-PSCMakeOption'
     'Invoke-CMakeOutput'
+    'Register-PSCMakeIde'
+    'Set-PSCMakeOption'
     'Write-CMakeBuild'
 )
 

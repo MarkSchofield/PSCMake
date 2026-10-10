@@ -39,6 +39,22 @@ The module provides the following commands:
 5. `Get-CMakeInclude` - Gets the fully-qualified paths to the headers included by a given source file.
 6. `Get-CMakePreprocess` - Gets the pre-processed output of a given source file.
 7. `Get-CMakeTarget` - Gets objects describing the targets of a CMake build (type, output path, artifacts, ...).
+8. `Get-PSCMakeOption` / `Set-PSCMakeOption` - Gets or sets session options (diagnostic formatting, IDE).
+9. `Register-PSCMakeIde` - Registers the `pscmake-vs://` handler so diagnostic links can open Visual Studio.
+
+### Compiler diagnostics
+
+`Build-CMakeBuild` colors compiler warnings and errors (MSVC, clang-cl, clang) and turns their `file(line,col)` /
+`file:line:col` locations into terminal hyperlinks that open the IDE at that position. It is on by default, and is
+skipped when output is redirected or `NO_COLOR` is set.
+
+- Opt out with `Set-PSCMakeOption -DiagnosticFormatting $false`, or `-NoDiagnosticFormatting` for one build.
+- Pick the IDE with `Set-PSCMakeOption -Ide VSCode|VisualStudio|File` (default `VSCode`). Options last for the session;
+  put them in `$PROFILE` to make them stick.
+- `VisualStudio` needs a one-time `Register-PSCMakeIde`, which registers a `pscmake-vs://` handler (HKCU, no
+  elevation) that drives a running Visual Studio. `Register-PSCMakeIde -Remove` undoes it.
+- Click links with Ctrl+click in Windows Terminal.
+- Formatting pipes the build output, so Ninja stops repainting its status line in place.
 
 Running `Build-CMakeBuild` by itself would run the first `buildConfiguration`. Run any command with `-?` to get more
 details.

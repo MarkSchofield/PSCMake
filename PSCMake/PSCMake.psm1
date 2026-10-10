@@ -28,6 +28,7 @@ $ErrorActionPreference = 'Stop'
 
 . $PSScriptRoot/Common/CMake.ps1
 . $PSScriptRoot/Common/Common.ps1
+. $PSScriptRoot/Common/Diagnostics.ps1
 . $PSScriptRoot/Common/Includes.ps1
 . $PSScriptRoot/Common/Ninja.ps1
 . $PSScriptRoot/Common/Options.ps1
@@ -390,6 +391,14 @@ function Configure-CMakeBuild {
     .Parameter Fresh
     A switch specifying whether a 'fresh' configuration should be performed before the build is run.
 
+    .Parameter NoDiagnosticFormatting
+    A switch disabling the coloring and hyperlinking of compiler warnings and errors for this build. See
+    Set-PSCMakeOption for the session-wide setting. Formatting is skipped automatically if output is redirected,
+    'NO_COLOR' is set, or the console doesn't support virtual terminal sequences.
+
+    .Parameter Ide
+    The IDE diagnostic hyperlinks open: 'VSCode', 'VisualStudio' or 'File'. Defaults to the 'Ide' option.
+
     .Parameter Arguments
     Additional arguments passed directly to the CMake build invocation.
 
@@ -431,11 +440,21 @@ function Build-CMakeBuild {
         [switch] $Fresh,
 
         [Parameter()]
+        [switch] $NoDiagnosticFormatting,
+
+        [Parameter()]
+        [ValidateSet('VSCode', 'VisualStudio', 'File')]
+        [string] $Ide,
+
+        [Parameter()]
         [string[]] $Arguments = @()
     )
     $CMakeRoot = FindCMakeRoot
     $CMakePresetsJson = GetCMakePresets
     $BuildPresets = GetMatchingBuildPresets $CMakePresetsJson $Preset
+
+    $FormatDiagnostics = (-not $NoDiagnosticFormatting) -and (Get-PSCMakeOption DiagnosticFormatting) -and (DiagnosticColorEnabled)
+    $DiagnosticIde = if ($Ide) { $Ide } else { Get-PSCMakeOption Ide }
 
     Write-Verbose "Arguments: $Arguments"
 
@@ -506,7 +525,13 @@ function Build-CMakeBuild {
                 Write-Verbose "CMake Arguments: $CMakeArguments"
 
                 $StartTime = [datetime]::Now
-                InvokeExecutable $CMake $CMakeArguments
+                if ($FormatDiagnostics) {
+                    # Piping stops Ninja repainting its in-place status line; opting out keeps the original behavior.
+                    InvokeExecutable $CMake $CMakeArguments 2>&1 |
+                        WriteAugmentedOutput -BaseDirectory (Resolve-Path -LiteralPath $BinaryDirectory).Path -Ide $DiagnosticIde -Style (GetDiagnosticStyle $BinaryDirectory)
+                } else {
+                    InvokeExecutable $CMake $CMakeArguments
+                }
                 if ($LASTEXITCODE -ne 0) {
                     Write-Error "Build failed. Command line: '$($CMake.Source)' $($CMakeArguments -join ' ')"
                 }
