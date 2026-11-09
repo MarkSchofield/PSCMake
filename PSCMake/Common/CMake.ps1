@@ -534,6 +534,24 @@ function Enable-CMakeBuildQuery {
         }
 }
 
+<#
+    .Synopsis
+    For the 'code model' target tuples given, loads the full 'target' JSON from the code model directory.
+#>
+function GetTargetJson {
+    param (
+        $CodeModelDirectory,
+        $TargetTuplesCodeModel
+    )
+    $TargetTuplesCodeModel |
+        ForEach-Object {
+            $JsonPath = Join-Path -Path $CodeModelDirectory -ChildPath $_.jsonFile
+            Get-Item -LiteralPath $JsonPath |
+                Get-Content |
+                ConvertFrom-Json
+            }
+}
+
 # For the 'code model' JSON that was found, load the full 'target' JSON to be able to find 'EXECUTABLE' targets.
 #
 function FilterExecutableTargets {
@@ -541,18 +559,79 @@ function FilterExecutableTargets {
         $CodeModelDirectory,
         $TargetTuplesCodeModel
     )
-    $TargetJsons = $TargetTuplesCodeModel |
-        ForEach-Object {
-            $JsonPath = Join-Path -Path $CodeModelDirectory -ChildPath $_.jsonFile
-            Get-Item -LiteralPath $JsonPath |
-                Get-Content |
-                ConvertFrom-Json
-            }
-
-    $TargetJsons |
+    GetTargetJson $CodeModelDirectory $TargetTuplesCodeModel |
         Where-Object {
             $_.type -eq 'EXECUTABLE'
         }
+}
+
+<#
+    .Synopsis
+    Resolves a code model path - which may be relative to the given base directory - to a fully-qualified path.
+#>
+function ResolveCodeModelPath {
+    param(
+        [string] $BaseDirectory,
+        [string] $Path
+    )
+    if (-not [System.IO.Path]::IsPathRooted($Path)) {
+        $Path = Join-Path -Path $BaseDirectory -ChildPath $Path
+    }
+    [System.IO.Path]::GetFullPath($Path)
+}
+
+<#
+    .Synopsis
+    Gets the fully-qualified path to the primary output of the given target (the artifact matching 'nameOnDisk').
+
+    .Outputs
+    The path to the target's output, or `$null` if the target has no output (e.g. 'INTERFACE_LIBRARY' or 'UTILITY').
+#>
+function GetTargetOutputPath {
+    param(
+        $CodeModel,
+        $TargetJson
+    )
+    $NameOnDisk = Get-MemberValue $TargetJson 'nameOnDisk'
+    if (-not $NameOnDisk) {
+        return $null
+    }
+    $Artifact = Get-MemberValue $TargetJson 'artifacts' -Or @() |
+        Where-Object { $_.path.EndsWith($NameOnDisk) } |
+        Select-Object -First 1
+    if ($Artifact) {
+        ResolveCodeModelPath $CodeModel.paths.build $Artifact.path
+    }
+}
+
+<#
+    .Synopsis
+    Creates the 'PSCMake.Target' object representing the given target JSON, for the given preset and configuration.
+#>
+function NewTargetObject {
+    param(
+        $CodeModel,
+        [string] $PresetName,
+        [string] $ConfigurationName,
+        $TargetJson
+    )
+    [PSCustomObject]@{
+        PSTypeName      = 'PSCMake.Target'
+        Name            = $TargetJson.name
+        Type            = $TargetJson.type
+        Preset          = $PresetName
+        Configuration   = $ConfigurationName
+        NameOnDisk      = Get-MemberValue $TargetJson 'nameOnDisk'
+        OutputPath      = GetTargetOutputPath $CodeModel $TargetJson
+        Artifacts       = @(Get-MemberValue $TargetJson 'artifacts' -Or @() |
+                ForEach-Object { ResolveCodeModelPath $CodeModel.paths.build $_.path })
+        SourceDirectory = ResolveCodeModelPath $CodeModel.paths.source $TargetJson.paths.source
+        BuildDirectory  = ResolveCodeModelPath $CodeModel.paths.build $TargetJson.paths.build
+        Sources         = @(Get-MemberValue $TargetJson 'sources' -Or @() |
+                ForEach-Object { ResolveCodeModelPath $CodeModel.paths.source $_.path })
+        Id              = $TargetJson.id
+        Json            = $TargetJson
+    }
 }
 
 <#
@@ -588,16 +667,17 @@ function Get-CMakeBuildCodeModel {
 
 <#
     .Synopsis
-    Gets the target with the given name, for the given configuration from the specified code model.
+    Gets the target(s) with the given name(s), for the given configuration from the specified code model. Names may
+    contain wildcards.
 
     .Outputs
-    The PowerShell representation of the target from the CodeModel JSON.
+    The PowerShell representation of the target(s) from the CodeModel JSON.
 #>
 function GetNamedTarget {
     param(
         $CodeModel,
         $Configuration,
-        $Name
+        [string[]] $Name
     )
     $CodeModelConfiguration = if ($Configuration) {
         $CodeModel.configurations | Where-Object { $_.name -eq $Configuration }
@@ -606,7 +686,8 @@ function GetNamedTarget {
     }
     $CodeModelConfiguration.targets |
         Where-Object {
-            $_.name -eq $Name
+            $TargetName = $_.name
+            $Name | Where-Object { ($TargetName -eq $_) -or ($TargetName -like $_) }
         }
 }
 
@@ -661,7 +742,7 @@ function GetCacheValue {
             Select-String "^$($CacheEntryName):.*=" |
             ForEach-Object {
                 $_.ToString().Split('=', 2) | Select-Object -Last 1
-        }
+            }
     }
 }
 

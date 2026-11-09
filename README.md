@@ -38,6 +38,7 @@ The module provides the following commands:
 4. `Invoke-CMakeOutput` - To run an executable output from a CMake build, by target name or implicitly by scope.
 5. `Get-CMakeInclude` - Gets the fully-qualified paths to the headers included by a given source file.
 6. `Get-CMakePreprocess` - Gets the pre-processed output of a given source file.
+7. `Get-CMakeTarget` - Gets objects describing the targets of a CMake build (type, output path, artifacts, ...).
 
 Running `Build-CMakeBuild` by itself would run the first `buildConfiguration`. Run any command with `-?` to get more
 details.
