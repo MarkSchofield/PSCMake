@@ -50,5 +50,35 @@
       </CustomControl>
     </View>
 
+    <!--
+      PSCMake.Target — emitted by Get-CMakeTarget.
+    -->
+    <View>
+      <Name>PSCMake.Target</Name>
+      <ViewSelectedBy>
+        <TypeName>PSCMake.Target</TypeName>
+      </ViewSelectedBy>
+      <TableControl>
+        <TableHeaders>
+          <TableColumnHeader><Label>Preset</Label></TableColumnHeader>
+          <TableColumnHeader><Label>Configuration</Label></TableColumnHeader>
+          <TableColumnHeader><Label>Name</Label></TableColumnHeader>
+          <TableColumnHeader><Label>Type</Label></TableColumnHeader>
+          <TableColumnHeader><Label>OutputPath</Label></TableColumnHeader>
+        </TableHeaders>
+        <TableRowEntries>
+          <TableRowEntry>
+            <TableColumnItems>
+              <TableColumnItem><PropertyName>Preset</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Configuration</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Name</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Type</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>OutputPath</PropertyName></TableColumnItem>
+            </TableColumnItems>
+          </TableRowEntry>
+        </TableRowEntries>
+      </TableControl>
+    </View>
+
   </ViewDefinitions>
 </Configuration>

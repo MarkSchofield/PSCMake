@@ -74,6 +74,7 @@ FunctionsToExport = @(
     'Configure-CMakeBuild'
     'Get-CMakeInclude'
     'Get-CMakePreprocess'
+    'Get-CMakeTarget'
     'Invoke-CMakeOutput'
     'Write-CMakeBuild'
 )

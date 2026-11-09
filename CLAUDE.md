@@ -50,12 +50,15 @@ The module is structured as a dot-sourced collection of scripts:
 
 **Public cmdlets** (defined in `PSCMake.psm1`):
 
-| Cmdlet                 | Purpose                           |
-|------------------------|-----------------------------------|
-| `Configure-CMakeBuild` | Run CMake configure step          |
-| `Build-CMakeBuild`     | Run CMake build step              |
-| `Write-CMakeBuild`     | Emit DGML or DOT dependency graph |
-| `Invoke-CMakeOutput`   | Run a built executable target     |
+| Cmdlet                 | Purpose                                     |
+|------------------------|---------------------------------------------|
+| `Build-CMakeBuild`     | Run CMake build step                        |
+| `Configure-CMakeBuild` | Run CMake configure step                    |
+| `Get-CMakeInclude`     | Get the `#include`s for a source file       |
+| `Get-CMakePreprocess`  | Get the preprocess output for a source file |
+| `Get-CMakeTarget`      | Enumerate code-model targets                |
+| `Invoke-CMakeOutput`   | Run a built executable target               |
+| `Write-CMakeBuild`     | Emit DGML or DOT dependency graph           |
 
 **Argument completers** are registered via `Register-ArgumentCompleter` at module load time and delegate to functions in `CMake.ps1` for preset, configuration, and target enumeration.
 

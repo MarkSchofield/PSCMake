@@ -126,6 +126,57 @@ function BuildConfigurationsCompleter {
 
 <#
     .Synopsis
+    Gets the binary directory and the code model targets for the preset and configuration being completed.
+#>
+function GetCompletionTargets {
+    param(
+        $Preset,
+        $Configuration
+    )
+    $CMakePresetsJson = GetCMakePresets -Silent
+    $BuildPreset = GetMatchingBuildPresets $CMakePresetsJson $Preset |
+        Select-Object -First 1
+    $ConfigurePreset = GetConfigurePresetFor $CMakePresetsJson $BuildPreset
+    $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
+    $CMakeCodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
+    if (-not $CMakeCodeModel) {
+        throw "Failed to get CMake code model from '$BinaryDirectory'"
+    }
+
+    # TODO: See if the $BuildPreset has a configuration.
+    $ConfigurationName = $Configuration ?? $CMakeCodeModel.configurations.Name |
+        Select-Object -First 1
+    $ConfigurationsJson = $CMakeCodeModel.configurations |
+        Where-Object -Property 'name' -EQ $ConfigurationName
+
+    [PSCustomObject]@{
+        BinaryDirectory = $BinaryDirectory
+        Targets         = $ConfigurationsJson.targets
+    }
+}
+
+<#
+    .Synopsis
+    An argument-completer for `Get-CMakeTarget`'s `-Target` parameter.
+#>
+function CodeModelTargetsCompleter {
+    param(
+        $CommandName,
+        $ParameterName,
+        $WordToComplete,
+        $CommandAst,
+        $FakeBoundParameters
+    )
+    $null = $CommandName
+    $null = $ParameterName
+    $null = $CommandAst
+    $CompletionTargets = GetCompletionTargets $FakeBoundParameters['Preset'] $FakeBoundParameters['Configuration']
+    $CompletionTargets.Targets.name |
+        Where-Object { $_ -ilike "$WordToComplete*" }
+}
+
+<#
+    .Synopsis
     An argument-completer for `Build-CMakeBuild`'s `-Targets` parameter.
 #>
 function BuildTargetsCompleter {
@@ -139,43 +190,25 @@ function BuildTargetsCompleter {
     $null = $CommandName
     $null = $ParameterName
     $null = $CommandAst
-    try {
-        $CMakePresetsJson = GetCMakePresets -Silent
-        $BuildPreset = GetMatchingBuildPresets $CMakePresetsJson $FakeBoundParameters['Preset'] |
-            Select-Object -First 1
-        $ConfigurePreset = GetConfigurePresetFor $CMakePresetsJson $BuildPreset
-        $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
-        $CMakeCodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
-        if (-not $CMakeCodeModel) {
-            throw "Failed to get CMake code model from '$BinaryDirectory'"
-        }
+    $CompletionTargets = GetCompletionTargets $FakeBoundParameters['Preset'] $FakeBoundParameters['Configuration']
+    $BinaryDirectory = $CompletionTargets.BinaryDirectory
+    $TargetNames = @($CompletionTargets.Targets.name)
 
-        # TODO: See if the $BuildPreset has a configuration.
-        $ConfigurationName = $FakeBoundParameters['Configuration'] ?? $CMakeCodeModel.configurations.Name |
-            Select-Object -First 1
-        $ConfigurationsJson = $CMakeCodeModel.configurations |
-            Where-Object -Property 'name' -EQ $ConfigurationName
-        $TargetNames = $ConfigurationsJson.targets.name
+    # Add standard CMake targets 'all', 'clean', 'install'
+    $TargetNames += @(
+        'all'
+        'clean'
+        'install'
+    )
 
-        # Add standard CMake targets 'all', 'clean', 'install'
-        $TargetNames += @(
-            'all'
-            'clean'
-            'install'
-        )
-
-        # Add standard CMake target 'test' if 'CTestTestfile.cmake' exists in the binary directory.
-        $CTestFilePath = Join-Path -Path $BinaryDirectory -ChildPath 'CTestTestfile.cmake'
-        if (Test-Path -Path $CTestFilePath -PathType Leaf -ErrorAction SilentlyContinue) {
-            $TargetNames += 'test'
-        }
-
-        $TargetNames |
-            Where-Object { $_ -ilike "$WordToComplete*" }
-    } catch {
-        ArgumentCompleterFeedback $_
-        @('')
+    # Add standard CMake target 'test' if 'CTestTestfile.cmake' exists in the binary directory.
+    $CTestFilePath = Join-Path -Path $BinaryDirectory -ChildPath 'CTestTestfile.cmake'
+    if (Test-Path -Path $CTestFilePath -PathType Leaf -ErrorAction SilentlyContinue) {
+        $TargetNames += 'test'
     }
+
+    $TargetNames |
+        Where-Object { $_ -ilike "$WordToComplete*" }
 }
 
 <#
@@ -193,33 +226,14 @@ function ExecutableTargetsCompleter {
     $null = $CommandName
     $null = $ParameterName
     $null = $CommandAst
-    try {
-        $CMakePresetsJson = GetCMakePresets -Silent
-        $BuildPreset = GetMatchingBuildPresets $CMakePresetsJson $FakeBoundParameters['Preset'] |
-            Select-Object -First 1
-        $ConfigurePreset = GetConfigurePresetFor $CMakePresetsJson $BuildPreset
-        $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
-        $CMakeCodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
-        if (-not $CMakeCodeModel) {
-            throw "Failed to get CMake code model from '$BinaryDirectory'"
-        }
+    $CompletionTargets = GetCompletionTargets $FakeBoundParameters['Preset'] $FakeBoundParameters['Configurations']
+    $TargetTuplesCodeModel = $CompletionTargets.Targets |
+        Where-Object { $_.name -ilike "$WordToComplete*" }
 
-        # TODO: See if the $BuildPreset has a configuration.
-        $ConfigurationName = $FakeBoundParameters['Configurations'] ?? $CMakeCodeModel.configurations.Name |
-            Select-Object -First 1
-        $ConfigurationsJson = $CMakeCodeModel.configurations |
-            Where-Object -Property 'name' -EQ $ConfigurationName
-
-        $TargetTuplesCodeModel = $ConfigurationsJson.targets |
-            Where-Object { $_.name -ilike "$WordToComplete*" }
-
-        # Use the 'code model' JSON to load the target-specific JSON to filter to targets with 'type' equal to 'EXECUTABLE'
-        $TargetTuples = FilterExecutableTargets (Get-CMakeBuildCodeModelDirectory $BinaryDirectory) $TargetTuplesCodeModel
-        $TargetTuples.name
-    } catch {
-        ArgumentCompleterFeedback $_
-        @('')
-    }
+    # Use the 'code model' JSON to load the target-specific JSON to filter to targets with 'type' equal to 'EXECUTABLE'
+    $CodeModelDirectory = Get-CMakeBuildCodeModelDirectory $CompletionTargets.BinaryDirectory
+    $TargetTuples = FilterExecutableTargets $CodeModelDirectory $TargetTuplesCodeModel
+    $TargetTuples.name
 }
 
 <#
@@ -649,13 +663,103 @@ function Invoke-CMakeOutput {
 
     # Build the fully qualified path to the output of the target an invoke it with the specified arguments.
     #
-    $TargetNamePath = $ExecutableTargetTuples.nameOnDisk
-    $TargetRelativePath = ($ExecutableTargetTuples.artifacts | Where-Object { $_.path.endsWith($TargetNamePath) }).path
-    $TargetPath = Join-Path -Path $CodeModel.paths.build -ChildPath $TargetRelativePath
+    $TargetPath = GetTargetOutputPath $CodeModel $ExecutableTargetTuples
 
     Write-Output "Running: $TargetPath $Arguments"
     Write-Output '----'
     InvokeExecutable $TargetPath $Arguments
+}
+
+<#
+    .Synopsis
+    Gets the targets of a CMake build.
+
+    .Description
+    `Get-CMakeTarget` reads the CMake File API code model for the specified 'buildPresets' entries and returns a
+    'PSCMake.Target' object for each matching target, exposing metadata such as the target type, output path and
+    artifacts. The full target JSON from the code model is available through the 'Json' property. The build must
+    have been configured (e.g. with `Configure-CMakeBuild`).
+
+    .Parameter Preset
+    The CMake build preset(s) to use. Supports wildcards. If none is specified the first available build preset is
+    used.
+
+    .Parameter Configuration
+    The CMake configuration name(s) (e.g. 'Release', 'Debug'). Supports wildcards. If none is specified the first
+    configuration in the code model is used.
+
+    .Parameter Target
+    One or more CMake target names. Supports wildcards. If none is specified the targets whose source directory falls
+    under the current directory are returned - all targets when run from the CMake root.
+
+    .Example
+    # Get all the targets of the default preset and configuration.
+    Get-CMakeTarget
+
+    .Example
+    # Get the output paths of all executable targets, for every configuration of the 'windows-x64' preset.
+    Get-CMakeTarget -Preset windows-x64 -Configuration * |
+        Where-Object Type -EQ 'EXECUTABLE' |
+        Select-Object -ExpandProperty OutputPath
+#>
+function Get-CMakeTarget {
+    [CmdletBinding()]
+    param(
+        [Alias('Presets')]
+        [SupportsWildcards()]
+        [Parameter(Position = 0)]
+        [string[]] $Preset,
+
+        [Alias('Configurations')]
+        [SupportsWildcards()]
+        [Parameter(Position = 1)]
+        [string[]] $Configuration,
+
+        [Alias('Targets')]
+        [SupportsWildcards()]
+        [Parameter(Position = 2)]
+        [string[]] $Target
+    )
+    $CMakePresetsJson = GetCMakePresets
+    $BuildPresets = GetMatchingBuildPresets $CMakePresetsJson $Preset
+    $ScopeLocation = (Get-Location).Path
+
+    foreach ($BuildPreset in $BuildPresets) {
+        $ConfigurePreset = GetConfigurePresetFor $CMakePresetsJson $BuildPreset
+        $BinaryDirectory = GetBinaryDirectory $CMakePresetsJson $ConfigurePreset
+
+        $CodeModel = Get-CMakeBuildCodeModel $BinaryDirectory
+        if (-not $CodeModel) {
+            Write-Error "No code model found in '$BinaryDirectory'. Run Configure-CMakeBuild first."
+        }
+        $CodeModelDirectory = Get-CMakeBuildCodeModelDirectory $BinaryDirectory
+
+        $ConfigurationNames = if ($Configuration) {
+            foreach ($CandidateConfigurationName in $Configuration) {
+                $MatchingNames = $CodeModel.configurations.name |
+                    Where-Object { ($_ -eq $CandidateConfigurationName) -or ($_ -like $CandidateConfigurationName) }
+                if (-not $MatchingNames) {
+                    Write-Error "Unable to find configuration '$CandidateConfigurationName' for preset '$($BuildPreset.name)'."
+                }
+                $MatchingNames
+            }
+        } else {
+            $CodeModel.configurations[0].name
+        }
+
+        foreach ($ConfigurationName in $ConfigurationNames) {
+            $TargetTuples = if ($Target) {
+                GetNamedTarget $CodeModel $ConfigurationName $Target
+            } else {
+                GetScopedTargets $CodeModel $ConfigurationName $ScopeLocation
+            }
+
+            GetTargetJson $CodeModelDirectory $TargetTuples |
+                ForEach-Object {
+                    NewTargetObject $CodeModel $BuildPreset.name $ConfigurationName $_
+                }
+        }
+    }
 }
 
 <#
@@ -872,3 +976,7 @@ Register-ArgumentCompleter -CommandName Write-CMakeBuild -ParameterName Configur
 
 Register-ArgumentCompleter -CommandName Get-CMakeInclude -ParameterName Preset -ScriptBlock $function:BuildPresetsCompleter
 Register-ArgumentCompleter -CommandName Get-CMakeInclude -ParameterName Configuration -ScriptBlock $function:BuildConfigurationsCompleter
+
+Register-ArgumentCompleter -CommandName Get-CMakeTarget -ParameterName Preset -ScriptBlock $function:BuildPresetsCompleter
+Register-ArgumentCompleter -CommandName Get-CMakeTarget -ParameterName Configuration -ScriptBlock $function:BuildConfigurationsCompleter
+Register-ArgumentCompleter -CommandName Get-CMakeTarget -ParameterName Target -ScriptBlock $function:CodeModelTargetsCompleter
